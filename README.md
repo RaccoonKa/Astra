@@ -1,2 +1,2 @@
-# IYA
+# Astra
 Your digital friend!
