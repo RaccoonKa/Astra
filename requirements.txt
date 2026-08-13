@@ -1,3 +1,4 @@
+#+- верный файл с библиотеками, мне мега впадлу его заполнять
 # Графический интерфейс
 PyQt6==6.6.1
 pyautogui==0.9.54
@@ -7,6 +8,7 @@ psutil==7.2.2
 pycaw==20251023
 comtypes==1.4.16
 pillow==12.2.0
+python-dotenv==1.0.1
 
 # Машинное обучение и PyTorch
 torch==2.2.0
@@ -15,22 +17,23 @@ torchaudio==2.2.0
 pandas==2.2.0
 scikit-learn==1.4.0
 
-# Аудио и Речь (Vosk + Звук)
+# Аудио и Речь (Vosk + Звук + TTS)
 vosk==0.3.45
 sounddevice==0.4.6
 numpy==1.26.3
 pyaudio==0.2.14
 omegaconf==2.3.1
-
+pyttsx3==2.90
 
 # Зрение (OpenCV)
 opencv-python==4.9.0.80
 
 # Векторная память (ChromaDB + Эмбеддинги)
-# chromadb>=0.5.0
-# sentence-transformers==2.3.1
+chromadb>=0.5.0
+sentence-transformers==2.3.1
 
-# Внешние сервисы и API (Google, Telegram, Погода)
+# Внешние сервисы и API (Google, Telegram, GigaChat, Погода)
+gigachat==0.1.31
 google-api-python-client==2.118.0
 google-auth-httplib2==0.2.0
 google-auth-oauthlib==1.2.0

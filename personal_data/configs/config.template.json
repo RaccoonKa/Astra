@@ -3,14 +3,26 @@
     "assistant_name": "Астра",
     "autostart": false,
     "modules": {
-        "vision": true,
+        "vision": false,
         "telegram": false,
         "gigachat": false,
-        "contacts": false
+        "contacts": false,
+        "memory": true
+    },
+    "speech": {
+        "vosk_model_path": "models/vosk-model-small-ru-0.22",
+        "tts_engine": "pyttsx3",
+        "voice_rate": 175,
+        "voice_volume": 1.0,
+        "energy_threshold": 300
     },
     "api_keys": {
         "gigachat": "",
         "telegram_token": "",
         "weather": ""
+    },
+    "paths": {
+        "google_credentials": "credentials.json",
+        "google_token": "token.json"
     }
 }
