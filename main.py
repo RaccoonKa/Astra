@@ -1,6 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QApplication
-from config import load_config
+from personal_data.configs.config import load_config
 from gui.chat_window import MainWindow
 from gui.tray import SystemTray
 

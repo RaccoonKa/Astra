@@ -1,0 +1,32 @@
+{
+    "intent2id": {
+        "get_weather": 0,
+        "lock_screen": 1,
+        "open_yandex_music": 2,
+        "play_hdrezka": 3,
+        "search_video": 4,
+        "set_volume": 5,
+        "shutdown": 6,
+        "take_screenshot": 7
+    },
+    "id2intent": {
+        "0": "get_weather",
+        "1": "lock_screen",
+        "2": "open_yandex_music",
+        "3": "play_hdrezka",
+        "4": "search_video",
+        "5": "set_volume",
+        "6": "shutdown",
+        "7": "take_screenshot"
+    },
+    "classes": [
+        "get_weather",
+        "lock_screen",
+        "open_yandex_music",
+        "play_hdrezka",
+        "search_video",
+        "set_volume",
+        "shutdown",
+        "take_screenshot"
+    ]
+}

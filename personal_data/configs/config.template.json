@@ -1,0 +1,16 @@
+{
+    "user_name": "друг",
+    "assistant_name": "Астра",
+    "autostart": false,
+    "modules": {
+        "vision": true,
+        "telegram": false,
+        "gigachat": false,
+        "contacts": false
+    },
+    "api_keys": {
+        "gigachat": "",
+        "telegram_token": "",
+        "weather": ""
+    }
+}

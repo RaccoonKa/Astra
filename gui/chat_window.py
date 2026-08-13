@@ -1,13 +1,78 @@
-import sys
+import os
 import math
 import random
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QLineEdit, QFrame, QGraphicsOpacityEffect
-from PyQt6.QtCore import Qt, QPoint, QRectF, QTimer, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
-from PyQt6.QtGui import QPainter, QPen, QColor, QLinearGradient, QRadialGradient, QBrush, QPainterPath
+import warnings
+import numpy as np
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QTextEdit, QLineEdit, QFrame, QGraphicsOpacityEffect
+)
+from PyQt6.QtCore import (
+    Qt, QPoint, QRectF, QTimer, QPropertyAnimation,
+    QEasingCurve, QParallelAnimationGroup, QThread, pyqtSignal
+)
+from PyQt6.QtGui import (
+    QPainter, QPen, QColor, QLinearGradient, QRadialGradient,
+    QBrush, QPainterPath, QFont, QFontDatabase
+)
 from gui.styles import MAIN_STYLE
 from gui.settings_window import SettingsFrame
 from audio.stt import STTThread
 from audio.tts import TTSThread
+from core.nlp.command_parser import CommandParser
+from core.system.actions import SystemActions
+from core.vision.vision_provider import VisionThread
+from core.vision.presence_manager import PresenceManager
+from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
+from comtypes import CoInitialize
+
+warnings.filterwarnings("ignore", message="data discontinuity in recording")
+
+
+class AudioVisualizerWorker(QThread):
+    audio_data_signal = pyqtSignal(float, float, bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.running = True
+
+    def run(self):
+        try:
+            import soundcard as sc
+            import warnings
+
+            warnings.filterwarnings("ignore", category=sc.SoundcardRuntimeWarning)
+
+            default_speaker = sc.default_speaker()
+            mic = sc.get_microphone(default_speaker.id, include_loopback=True)
+
+            with mic.recorder(samplerate=44100) as recorder:
+                while self.running:
+                    data = recorder.record(numframes=2048)
+
+                    samples = data[:, 0]
+                    rms = float(np.sqrt(np.mean(samples ** 2)))
+
+                    if rms < 0.01:
+                        self.audio_data_signal.emit(0.0, 45.0, False)
+                        continue
+
+                    fft_vals = np.abs(np.fft.rfft(samples))
+                    bass = float(np.sum(fft_vals[1:15]))
+
+                    impulse = min(1.0, rms * 1.8 + bass * 0.004)
+
+                    hue = 45.0
+                    self.audio_data_signal.emit(impulse, hue, True)
+
+        except ImportError:
+            print("[Visualizer Error]: Установите библиотеку soundcard: pip install soundcard")
+        except Exception as e:
+            print(f"[Visualizer Error]: {e}")
+
+    def stop(self):
+        self.running = False
+        self.wait()
 
 
 class ArcMicButton(QPushButton):
@@ -17,8 +82,13 @@ class ArcMicButton(QPushButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.pulse = 0.0
-        self.boost = 0.25
+        self.boost = 0.0
         self.is_listening = False
+        self.is_speaking = False
+
+        self.beat_impulse = 0.0
+        self.target_impulse = 0.0
+        self.music_hue = 45.0
 
         self.particles = []
         for _ in range(700):
@@ -43,18 +113,38 @@ class ArcMicButton(QPushButton):
     def set_listening(self, state: bool):
         self.is_listening = state
 
+    def set_speaking(self, state: bool):
+        self.is_speaking = state
+
+    def on_audio_data(self, impulse: float, hue: float, is_music: bool):
+        if self.is_speaking:
+            self.target_impulse = 0.0
+            return
+
+        if is_music:
+            if impulse > self.target_impulse:
+                self.target_impulse = impulse
+            self.music_hue = hue
+
     def animate(self):
         self.pulse += 0.015
 
+        self.beat_impulse += (self.target_impulse - self.beat_impulse) * 0.08
+        self.target_impulse *= 0.93
+
         if self.is_listening:
             target_boost = 2.0
+        elif self.is_speaking:
+            target_boost = 1.2 + math.sin(self.pulse * 6.0) * 0.8
         else:
-            target_boost = 1.0 if self.underMouse() else 0.25
+            target_boost = 0.0
 
-        self.boost += (target_boost - self.boost) * 0.06
+        self.boost += (target_boost - self.boost) * 0.02
+
+        effective_boost = max(self.boost, self.beat_impulse * 3.0)
 
         for p in self.particles:
-            p['angle'] = (p['angle'] + p['speed'] * self.boost) % (math.pi * 2)
+            p['angle'] = (p['angle'] + p['speed'] * (1.0 + effective_boost)) % (math.pi * 2)
 
         self.update()
 
@@ -63,26 +153,36 @@ class ArcMicButton(QPushButton):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         cx, cy = 130, 130
-        p_val = math.sin(self.pulse) * 1.5
+        p_val = math.sin(self.pulse) * (2.5 if self.is_speaking else 1.2)
 
-        void_shadow = QRadialGradient(cx, cy, 42)
+        active_impulse = self.beat_impulse
+
+        void_radius = 42 + (active_impulse * 20.0)
+
+        void_shadow = QRadialGradient(cx, cy, void_radius)
         void_shadow.setColorAt(0.0, QColor(0, 0, 0, 255))
         void_shadow.setColorAt(0.85, QColor(0, 0, 0, 255))
         void_shadow.setColorAt(1.0, QColor(0, 0, 0, 0))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(void_shadow))
-        painter.drawEllipse(QRectF(cx - 42, cy - 42, 84, 84))
+        painter.drawEllipse(QRectF(cx - void_radius, cy - void_radius, void_radius * 2, void_radius * 2))
 
         for p in self.particles:
-            rad = p['r'] + p_val * (1 if p['size'] > 1.2 else -1)
+            rad = p['r'] + (p_val * (1 if p['size'] > 1.2 else -1)) + (active_impulse * 25.0)
             px = cx + math.cos(p['angle']) * rad
             py = cy + math.sin(p['angle']) * rad
 
-            col = QColor(p['color'])
-            col.setAlpha(int(p['alpha'] * (0.85 if self.boost < 0.6 else 1.0)))
+            if active_impulse > 0.01 and not self.is_speaking:
+                p_hue = 42 + int(math.sin(p['angle'] * 5) * 6)
+                col = QColor.fromHsv(p_hue, 120, 220)
+            else:
+                col = QColor(p['color'])
+
+            col.setAlpha(int(p['alpha'] * (0.85 if self.boost < 0.6 and active_impulse < 0.01 else 1.0)))
 
             painter.setBrush(QBrush(col))
-            sz = p['size']
+
+            sz = p['size'] + (active_impulse * 2.0)
             painter.drawEllipse(QRectF(px - sz / 2, py - sz / 2, sz, sz))
 
 
@@ -227,9 +327,12 @@ class BackgroundFrame(QFrame):
         shift2 = math.cos(self.wave_phase * 0.6) * 24
 
         curves = [
-            ((w * 0.02, h + 80), (w * 0.35 + shift1, h * 0.42 + shift2), (w * 0.68 - shift2, h * 0.82 + shift1), (w + 80, h * 0.18)),
-            ((w * 0.15, h + 80), (w * 0.48 - shift2, h * 0.52 + shift1), (w * 0.78 + shift1, h * 0.78 - shift2), (w + 80, h * 0.42)),
-            ((w * 0.32, h + 80), (w * 0.62 + shift1, h * 0.65 - shift2), (w * 0.88 - shift1, h * 0.86 + shift2), (w + 80, h * 0.68))
+            ((w * 0.02, h + 80), (w * 0.35 + shift1, h * 0.42 + shift2), (w * 0.68 - shift2, h * 0.82 + shift1),
+             (w + 80, h * 0.18)),
+            ((w * 0.15, h + 80), (w * 0.48 - shift2, h * 0.52 + shift1), (w * 0.78 + shift1, h * 0.78 - shift2),
+             (w + 80, h * 0.42)),
+            ((w * 0.32, h + 80), (w * 0.62 + shift1, h * 0.65 - shift2), (w * 0.88 - shift1, h * 0.86 + shift2),
+             (w + 80, h * 0.68))
         ]
 
         for d in self.dust_cloud:
@@ -257,17 +360,76 @@ class BackgroundFrame(QFrame):
         super().paintEvent(event)
 
 
+class VolumeDucker:
+    def __init__(self):
+        self.saved_volumes = {}
+
+    def duck(self):
+        try:
+            CoInitialize()
+            self.saved_volumes.clear()
+            sessions = AudioUtilities.GetAllSessions()
+
+            for session in sessions:
+                process = session.Process
+                if process:
+                    name = process.name().lower()
+
+                    if "python" in name or "pycharm" in name:
+                        continue
+
+                    volume = session._ctl.QueryInterface(ISimpleAudioVolume)
+                    current_vol = volume.GetMasterVolume()
+                    self.saved_volumes[process.pid] = current_vol
+
+                    volume.SetMasterVolume(current_vol * 0.10, None)
+        except Exception as e:
+            print(f"[Volume Ducker Error]: {e}")
+
+    def restore(self):
+        try:
+            CoInitialize()
+            sessions = AudioUtilities.GetAllSessions()
+
+            for session in sessions:
+                process = session.Process
+                if process and process.pid in self.saved_volumes:
+                    volume = session._ctl.QueryInterface(ISimpleAudioVolume)
+
+                    saved_vol = self.saved_volumes[process.pid]
+                    volume.SetMasterVolume(saved_vol, None)
+
+            self.saved_volumes.clear()
+        except Exception as e:
+            print(f"[Volume Ducker Error]: {e}")
+
+
 class MainWindow(QWidget):
     def __init__(self, config):
         super().__init__()
         self.config = config
         self.drag_position = QPoint()
         self.ui_revealed = False
+        self.command_parser = CommandParser()
 
         self.init_ui()
         self.init_audio()
+        QTimer.singleShot(2000, self.init_vision)
 
     def init_ui(self):
+        font_path = os.path.join("assets", "fonts", "Schiffbauer-Regular.otf")
+        font_id = QFontDatabase.addApplicationFont(font_path)
+
+        if font_id != -1:
+            self.font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
+            self.custom_font = QFont(self.font_family, 11)
+        else:
+            print("[UI Warning]: Не удалось загрузить шрифт. Используем системный.")
+            self.font_family = "Arial"
+            self.custom_font = QFont(self.font_family, 11)
+
+        self.setFont(self.custom_font)
+
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.resize(750, 450)
@@ -283,7 +445,6 @@ class MainWindow(QWidget):
         container_layout.setContentsMargins(6, 6, 6, 6)
         container_layout.setSpacing(0)
 
-        # Основная левая зона
         self.right_area = QWidget()
         right_area_layout = QVBoxLayout()
         right_area_layout.setContentsMargins(0, 0, 0, 0)
@@ -292,7 +453,6 @@ class MainWindow(QWidget):
         title_bar = QHBoxLayout()
         title_bar.setContentsMargins(10, 0, 10, 0)
 
-        # Создаем эффект прозрачности специально для кнопок вызова панелей
         self.title_btns_widget = QWidget()
         title_btns_layout = QHBoxLayout(self.title_btns_widget)
         title_btns_layout.setContentsMargins(0, 0, 0, 0)
@@ -313,7 +473,6 @@ class MainWindow(QWidget):
         title_bar.addWidget(self.title_btns_widget)
         title_bar.addStretch()
 
-        # Кнопки окна остаются открытыми вне анимируемых слоев
         min_btn = QPushButton("—")
         min_btn.setObjectName("MinBtn")
         min_btn.setFixedWidth(30)
@@ -349,7 +508,8 @@ class MainWindow(QWidget):
         left_layout.addStretch()
 
         author_label = QLabel("Created by Svetozar")
-        author_label.setStyleSheet("color: rgba(255, 255, 255, 0.35); font-size: 11px; font-weight: 500;")
+        author_label.setStyleSheet(
+            f"font-family: '{self.font_family}'; color: rgba(255, 255, 255, 0.35); font-size: 13px; font-weight: 500;")
         left_layout.addWidget(author_label, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
 
         self.left_panel.setLayout(left_layout)
@@ -359,12 +519,12 @@ class MainWindow(QWidget):
         self.right_area.setLayout(right_area_layout)
         container_layout.addWidget(self.right_area)
 
-        # Правая сторона: анимируемые плашки
         self.settings_panel = SettingsFrame()
         self.settings_panel.setObjectName("SettingsPanel")
         self.settings_panel.setMinimumWidth(0)
         self.settings_panel.setMaximumWidth(0)
         self.settings_panel.hide()
+        self.settings_panel.speak_requested.connect(self.speak_reply)
         container_layout.addWidget(self.settings_panel)
 
         self.right_panel = ChatFrame()
@@ -375,8 +535,11 @@ class MainWindow(QWidget):
         container_layout.addWidget(self.right_panel)
 
         self.chat_history = self.right_panel.chat_history
+        self.chat_history.setFont(QFont(self.font_family, 12))
         self.input_field = self.right_panel.input_field
+        self.input_field.setFont(QFont(self.font_family, 12))
         self.send_button = self.right_panel.send_button
+        self.send_button.setFont(QFont(self.font_family, 12))
 
         self.input_field.returnPressed.connect(self.send_message)
         self.send_button.clicked.connect(self.send_message)
@@ -385,7 +548,6 @@ class MainWindow(QWidget):
         main_layout.addWidget(container)
         self.setLayout(main_layout)
 
-        # Анимируем только микрофон и левую панель со значками ⚙/💭
         self.main_ui_opacity = QGraphicsOpacityEffect(self.left_panel)
         self.left_panel.setGraphicsEffect(self.main_ui_opacity)
         self.main_ui_opacity.setOpacity(0.0)
@@ -402,7 +564,6 @@ class MainWindow(QWidget):
         self.settings_panel.setGraphicsEffect(self.settings_opacity)
         self.settings_opacity.setOpacity(0.0)
 
-        # Блокируем невидимые кнопки на старте
         self.set_ui_interactive(False)
 
         self.anim_group = QParallelAnimationGroup(self)
@@ -420,16 +581,69 @@ class MainWindow(QWidget):
         self.stt_thread.start()
 
         self.tts_thread = TTSThread(parent=self)
+        self.ducker = VolumeDucker()
         self.tts_thread.speaking_started.connect(self.on_initial_speech_started)
+        self.tts_thread.speaking_started.connect(lambda: self.mic_btn.set_speaking(True))
+        self.tts_thread.speaking_finished.connect(lambda: self.mic_btn.set_speaking(False))
 
-        self.mic_btn.clicked.connect(self.stt_thread.toggle_listening)
+        self.tts_thread.speaking_started.connect(lambda: self.stt_thread.set_speaking(True))
+        self.tts_thread.speaking_finished.connect(lambda: self.stt_thread.set_speaking(False))
 
-        self.tts_thread.start_with_greeting("Привет, Светозар")
+        self.tts_thread.speaking_started.connect(self.ducker.duck)
+        self.tts_thread.speaking_finished.connect(self.ducker.restore)
+
+        self.mic_btn.clicked.connect(self.stt_thread.trigger_manual_listen)
+
+        self.audio_worker = AudioVisualizerWorker(parent=self)
+        self.audio_worker.audio_data_signal.connect(self.mic_btn.on_audio_data)
+        self.audio_worker.start()
+
+        user_name = "друг"
+        if isinstance(self.config, dict):
+            user_name = self.config.get("user_name", "друг")
+
+        self.tts_thread.start_with_greeting(f"Привет, {user_name}!")
+
+    def init_vision(self):
+        self.vision_thread = VisionThread(camera_index=0, parent=self)
+        self.presence_manager = PresenceManager(timeout_seconds=300, parent=self)
+
+        self.vision_thread.face_detected_signal.connect(self.presence_manager.process_face_status)
+        self.vision_thread.gesture_detected_signal.connect(self.on_gesture_detected)
+
+        user_name = "друг"
+        if isinstance(self.config, dict):
+            user_name = self.config.get("user_name", "друг")
+
+        self.presence_manager.user_left.connect(SystemActions.lock_screen)
+        self.presence_manager.user_returned.connect(lambda: self.tts_thread.say(f"С возвращением, {user_name}!"))
+        self.presence_manager.unknown_user_detected.connect(self.on_unknown_user)
+
+        self.vision_thread.start()
+
+    def on_unknown_user(self):
+        cfg = SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
+        if not cfg.get("modules", {}).get("vision", True):
+            return
+
+        self.tts_thread.say("Обнаружен посторонний пользователь. Блокирую систему.")
+        SystemActions.lock_screen()
+
+    def on_gesture_detected(self, gesture_name):
+        cfg = SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
+        if not cfg.get("modules", {}).get("gestures", True):
+            return
+
+        if gesture_name == "open_palm":
+            SystemActions.media_play_pause()
+        elif gesture_name == "fist":
+            SystemActions.lock_screen()
+        elif gesture_name == "pointing":
+            SystemActions.media_next_track()
 
     def on_initial_speech_started(self):
         if not self.ui_revealed:
             self.ui_revealed = True
-            self.chat_history.append("Астра: Привет, Светозар")
 
             self.set_ui_interactive(True)
 
@@ -451,18 +665,25 @@ class MainWindow(QWidget):
             self.reveal_group.start()
 
     def speak_reply(self, text):
-        self.chat_history.append(f"Астра: {text}")
-        self.tts_thread.say(text)
+        if text:
+            self.tts_thread.say(text)
 
     def on_speech_recognized(self, text):
-        self.chat_history.append(f"Вы (голос): {text}")
-        reply = f"Приняла команду '{text}'"
-        self.speak_reply(reply)
+        if not self.ui_revealed:
+            return
+
+        response = self.command_parser.process_command(text)
+        if response:
+            self.speak_reply(response)
 
     def on_stt_error(self, err):
-        self.chat_history.append(f"Система: {err}")
+        pass
 
     def closeEvent(self, event):
+        if hasattr(self, 'vision_thread'):
+            self.vision_thread.stop()
+        if hasattr(self, 'audio_worker'):
+            self.audio_worker.stop()
         if hasattr(self, 'stt_thread'):
             self.stt_thread.stop_thread()
         super().closeEvent(event)
@@ -505,7 +726,8 @@ class MainWindow(QWidget):
             if self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0:
                 self.toggle_chat()
 
-            cur_w = self.settings_panel.width() if (self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0) else 0
+            cur_w = self.settings_panel.width() if (
+                    self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0) else 0
             self.settings_panel.setMinimumWidth(cur_w)
             self.settings_panel.setMaximumWidth(cur_w)
             self.settings_panel.show()
@@ -560,7 +782,8 @@ class MainWindow(QWidget):
             if self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0:
                 self.toggle_settings()
 
-            cur_w = self.right_panel.width() if (self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0) else 0
+            cur_w = self.right_panel.width() if (
+                    self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0) else 0
             self.right_panel.setMinimumWidth(cur_w)
             self.right_panel.setMaximumWidth(cur_w)
             self.right_panel.show()
@@ -588,9 +811,13 @@ class MainWindow(QWidget):
             event.accept()
 
     def send_message(self):
+        if not self.ui_revealed:
+            return
         text = self.input_field.text().strip()
         if text:
             self.chat_history.append(f"Вы: {text}")
-            reply = f"Приняла команду '{text}'"
-            self.speak_reply(reply)
+            response = self.command_parser.process_command(text)
+            if response:
+                self.chat_history.append(f"Астра: {response}\n")
+                self.speak_reply(response)
             self.input_field.clear()

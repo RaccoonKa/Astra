@@ -1,5 +1,12 @@
 # Графический интерфейс
 PyQt6==6.6.1
+pyautogui==0.9.54
+
+# Система
+psutil==7.2.2
+pycaw==20251023
+comtypes==1.4.16
+pillow==12.2.0
 
 # Машинное обучение и PyTorch
 torch==2.2.0
@@ -29,3 +36,4 @@ google-auth-httplib2==0.2.0
 google-auth-oauthlib==1.2.0
 python-telegram-bot==20.8
 requests==2.31.0
+wikipedia==1.4.0
