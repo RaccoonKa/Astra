@@ -17,7 +17,7 @@ ml_research/
 ├── prepare_data_files/     # Data preprocessing scripts
 ├── converter_files/        # Conversion tools
 └── optimized_models/       # Ready-to-use ONNX models for fast inference
-
+```
 
 ## 🧠 Main Components
 
@@ -96,7 +96,7 @@ ml_research/
 ├── prepare_data_files/     # Скрипты предобработки данных
 ├── converter_files/        # Инструменты для конвертации
 └── optimized_models/       # Готовые ONNX-модели для быстрого инференса
-
+```
 
 ## 🧠 Основные компоненты
 
