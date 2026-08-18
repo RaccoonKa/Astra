@@ -9,8 +9,10 @@
     "I-movie_or_show": 6,
     "B-number": 7,
     "I-number": 8,
-    "B-track": 9,
-    "I-track": 10
+    "B-service": 9,
+    "I-service": 10,
+    "B-track": 11,
+    "I-track": 12
   },
   "id2label": {
     "0": "O",
@@ -22,7 +24,9 @@
     "6": "I-movie_or_show",
     "7": "B-number",
     "8": "I-number",
-    "9": "B-track",
-    "10": "I-track"
+    "9": "B-service",
+    "10": "I-service",
+    "11": "B-track",
+    "12": "I-track"
   }
 }

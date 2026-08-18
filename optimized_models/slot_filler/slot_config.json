@@ -1,0 +1,32 @@
+{
+  "label2id": {
+    "O": 0,
+    "B-artist": 1,
+    "I-artist": 2,
+    "B-city": 3,
+    "I-city": 4,
+    "B-movie_or_show": 5,
+    "I-movie_or_show": 6,
+    "B-number": 7,
+    "I-number": 8,
+    "B-service": 9,
+    "I-service": 10,
+    "B-track": 11,
+    "I-track": 12
+  },
+  "id2label": {
+    "0": "O",
+    "1": "B-artist",
+    "2": "I-artist",
+    "3": "B-city",
+    "4": "I-city",
+    "5": "B-movie_or_show",
+    "6": "I-movie_or_show",
+    "7": "B-number",
+    "8": "I-number",
+    "9": "B-service",
+    "10": "I-service",
+    "11": "B-track",
+    "12": "I-track"
+  }
+}

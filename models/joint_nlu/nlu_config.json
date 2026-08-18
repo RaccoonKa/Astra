@@ -1,25 +1,23 @@
 {
   "intent2id": {
-    "chat": 0,
-    "get_weather": 1,
-    "lock_screen": 2,
-    "open_yandex_music": 3,
-    "play_hdrezka": 4,
-    "search_video": 5,
-    "set_volume": 6,
-    "shutdown": 7,
-    "take_screenshot": 8
+    "get_weather": 0,
+    "lock_screen": 1,
+    "play_hdrezka": 2,
+    "play_music": 3,
+    "search_video": 4,
+    "set_volume": 5,
+    "shutdown": 6,
+    "take_screenshot": 7
   },
   "id2intent": {
-    "0": "chat",
-    "1": "get_weather",
-    "2": "lock_screen",
-    "3": "open_yandex_music",
-    "4": "play_hdrezka",
-    "5": "search_video",
-    "6": "set_volume",
-    "7": "shutdown",
-    "8": "take_screenshot"
+    "0": "get_weather",
+    "1": "lock_screen",
+    "2": "play_hdrezka",
+    "3": "play_music",
+    "4": "search_video",
+    "5": "set_volume",
+    "6": "shutdown",
+    "7": "take_screenshot"
   },
   "slot2id": {
     "O": 0,
@@ -31,8 +29,10 @@
     "I-movie_or_show": 6,
     "B-number": 7,
     "I-number": 8,
-    "B-track": 9,
-    "I-track": 10
+    "B-service": 9,
+    "I-service": 10,
+    "B-track": 11,
+    "I-track": 12
   },
   "id2slot": {
     "0": "O",
@@ -44,7 +44,9 @@
     "6": "I-movie_or_show",
     "7": "B-number",
     "8": "I-number",
-    "9": "B-track",
-    "10": "I-track"
+    "9": "B-service",
+    "10": "I-service",
+    "11": "B-track",
+    "12": "I-track"
   }
 }

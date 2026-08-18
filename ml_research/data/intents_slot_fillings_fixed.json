@@ -888,507 +888,6 @@
     "entities": []
   },
   {
-    "text": "включи трек король и шут на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 12,
-        "end": 24,
-        "value": "король и шут"
-      }
-    ]
-  },
-  {
-    "text": "яндекс музыка найди песню группа крови",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 26,
-        "end": 38,
-        "value": "группа крови"
-      }
-    ]
-  },
-  {
-    "text": "хочу послушать кино",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 15,
-        "end": 19,
-        "value": "кино"
-      }
-    ]
-  },
-  {
-    "text": "вруби мой плейлист на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "астра включи музыку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "яндекс музыка",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "посоветуй что нибудь из рока",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "запусти трек ария",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 13,
-        "end": 17,
-        "value": "ария"
-      }
-    ]
-  },
-  {
-    "text": "яндекс музыка трек мой рок н ролл",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 19,
-        "end": 33,
-        "value": "мой рок н ролл"
-      }
-    ]
-  },
-  {
-    "text": "хочу услышать последний альбом сплин",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 31,
-        "end": 36,
-        "value": "сплин"
-      }
-    ]
-  },
-  {
-    "text": "включи что то веселое на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "открой мне плейлист дня на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "яндекс музыка исполнитель ддт",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 26,
-        "end": 29,
-        "value": "ддт"
-      }
-    ]
-  },
-  {
-    "text": "поставь песню кукушка",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 14,
-        "end": 21,
-        "value": "кукушка"
-      }
-    ]
-  },
-  {
-    "text": "хочу послушать би 2",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 15,
-        "end": 19,
-        "value": "би 2"
-      }
-    ]
-  },
-  {
-    "text": "я хочу послушать короля и шута",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 17,
-        "end": 30,
-        "value": "короля и шута"
-      }
-    ]
-  },
-  {
-    "text": "включи новинки на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "запусти яндекс музыку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "поставь мне группу сектор газа",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 19,
-        "end": 30,
-        "value": "сектор газа"
-      }
-    ]
-  },
-  {
-    "text": "вруби спокойную музыку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "срочно включи трек перемен",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 19,
-        "end": 26,
-        "value": "перемен"
-      }
-    ]
-  },
-  {
-    "text": "яндекс музыкаль ищи пикник",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 20,
-        "end": 26,
-        "value": "пикник"
-      }
-    ]
-  },
-  {
-    "text": "астра хочу музыку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "запусти яндекс музон",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "включи случайный трек",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "найди песню ледокол на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 12,
-        "end": 19,
-        "value": "ледокол"
-      }
-    ]
-  },
-  {
-    "text": "включи радио на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "яндекс музыка хочу слушать рок",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "послушать бы ленинград",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 13,
-        "end": 22,
-        "value": "ленинград"
-      }
-    ]
-  },
-  {
-    "text": "давай музыку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "музыку давай",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "открой яндекс музыку и включи мой микс",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "включи песню три полоски от зверей",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 13,
-        "end": 24,
-        "value": "три полоски"
-      },
-      {
-        "entity": "artist",
-        "start": 28,
-        "end": 34,
-        "value": "зверей"
-      }
-    ]
-  },
-  {
-    "text": "заведи музон",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "астра вруби русский рэп",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "включай фонк на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "поставь альбом легенда группы кино",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 30,
-        "end": 34,
-        "value": "кино"
-      }
-    ]
-  },
-  {
-    "text": "яндекс музыка трек белая ночь",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 19,
-        "end": 29,
-        "value": "белая ночь"
-      }
-    ]
-  },
-  {
-    "text": "включи детскую песню на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "яндекс музыкалю найди руки вверх",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 22,
-        "end": 32,
-        "value": "руки вверх"
-      }
-    ]
-  },
-  {
-    "text": "хочу послушать что то из девяностых",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "запусти яндекс музяку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "включи что нибудь",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "тихо включи музыку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "астра слушай сюда поставь металлику",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 26,
-        "end": 35,
-        "value": "металлику"
-      }
-    ]
-  },
-  {
-    "text": "включи песню про зайцев на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 13,
-        "end": 23,
-        "value": "про зайцев"
-      }
-    ]
-  },
-  {
-    "text": "яндекс музыка топ чарт",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "го музыку слушать",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "запусти плейлист для тренировки на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "вруби потяжелее",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "найди мне ту песню из тиктока",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "поставь бумбокс вахтерам",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 16,
-        "end": 24,
-        "value": "вахтерам"
-      },
-      {
-        "entity": "artist",
-        "start": 8,
-        "end": 15,
-        "value": "бумбокс"
-      }
-    ]
-  },
-  {
-    "text": "что там нового вышло на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "музыка",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "астра включи музло",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "включи трек эйфория на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "track",
-        "start": 12,
-        "end": 19,
-        "value": "эйфория"
-      }
-    ]
-  },
-  {
-    "text": "послушать молчат дома",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 10,
-        "end": 21,
-        "value": "молчат дома"
-      }
-    ]
-  },
-  {
-    "text": "хочу концертную запись агаты кристи",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 23,
-        "end": 35,
-        "value": "агаты кристи"
-      }
-    ]
-  },
-  {
-    "text": "яндекс музыка ищи арию",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 18,
-        "end": 22,
-        "value": "арию"
-      }
-    ]
-  },
-  {
-    "text": "включи группу звери",
-    "intent": "open_yandex_music",
-    "entities": [
-      {
-        "entity": "artist",
-        "start": 14,
-        "end": 19,
-        "value": "звери"
-      }
-    ]
-  },
-  {
     "text": "найди на ютубе обзоры на новый bmw",
     "intent": "search_video",
     "entities": []
@@ -3073,81 +2572,6 @@
     ]
   },
   {
-    "text": "включи мою волну на яндекс музыке",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "астра вруби мою волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "запусти волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "яндекс музыка моя волна",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "хочу мою волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "включи волну рекомендаций",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "астра запусти мою волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "давай мою волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "моя волна на яндексе",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "вруби мою музыку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "включи мою музяку",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "астра го мою волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "поставь мою волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "замути мою волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
-    "text": "хочу слушать мою волну",
-    "intent": "open_yandex_music",
-    "entities": []
-  },
-  {
     "text": "че там по музлу на ютубе",
     "intent": "search_video",
     "entities": []
@@ -3705,13 +3129,13 @@
     ]
   },
   {
-    "text": "запусти hdrezka и найди наруто шипуден",
+    "text": "запусти резку и найди наруто шипуден",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 24,
-        "end": 38,
+        "start": 22,
+        "end": 36,
         "value": "наруто шипуден"
       }
     ]
@@ -3816,7 +3240,7 @@
     ]
   },
   {
-    "text": "найти сериал друзья на hdrezka",
+    "text": "найти сериал друзья на резка",
     "intent": "play_hdrezka",
     "entities": [
       {
@@ -3840,7 +3264,7 @@
     ]
   },
   {
-    "text": "посмотри клинок рассекающий демонов на хдрезке",
+    "text": "посмотри клинок рассекающий демонов на резке",
     "intent": "play_hdrezka",
     "entities": [
       {
@@ -3857,13 +3281,13 @@
     "entities": []
   },
   {
-    "text": "открой hdrezka и найди сериал офис",
+    "text": "открой реска и найди сериал офис",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 30,
-        "end": 34,
+        "start": 28,
+        "end": 32,
         "value": "офис"
       }
     ]
@@ -3905,13 +3329,13 @@
     ]
   },
   {
-    "text": "найди на hdrezka мультик корпорация монстров",
+    "text": "найди на реске мультик корпорация монстров",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 25,
-        "end": 44,
+        "start": 23,
+        "end": 42,
         "value": "корпорация монстров"
       }
     ]
@@ -3929,19 +3353,19 @@
     ]
   },
   {
-    "text": "включи на hdrezka аниме токийский гуль",
+    "text": "включи на реска аниме токийский гуль",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 24,
-        "end": 38,
+        "start": 22,
+        "end": 36,
         "value": "токийский гуль"
       }
     ]
   },
   {
-    "text": "запусти резку и покажи матрицу",
+    "text": "запусти реску и покажи матрицу",
     "intent": "play_hdrezka",
     "entities": [
       {
@@ -3953,19 +3377,19 @@
     ]
   },
   {
-    "text": "астра открой hdrezka и найди рика и морти",
+    "text": "астра открой реска и найди рика и морти",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 29,
-        "end": 41,
+        "start": 27,
+        "end": 39,
         "value": "рика и морти"
       }
     ]
   },
   {
-    "text": "покажи на резке фильм криминальное чтиво",
+    "text": "покажи на реска фильм криминальное чтиво",
     "intent": "play_hdrezka",
     "entities": [
       {
@@ -3977,19 +3401,19 @@
     ]
   },
   {
-    "text": "вруби на хдрезке сериал ведьмак",
+    "text": "вруби на реске сериал ведьмак",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 24,
-        "end": 31,
+        "start": 22,
+        "end": 29,
         "value": "ведьмак"
       }
     ]
   },
   {
-    "text": "найди на резке доктора хауса",
+    "text": "найди на реске доктора хауса",
     "intent": "play_hdrezka",
     "entities": [
       {
@@ -4001,13 +3425,13 @@
     ]
   },
   {
-    "text": "го смотреть на hdrezka остров сокровищ",
+    "text": "го смотреть на резка остров сокровищ",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 23,
-        "end": 38,
+        "start": 21,
+        "end": 36,
         "value": "остров сокровищ"
       }
     ]
@@ -4049,13 +3473,13 @@
     ]
   },
   {
-    "text": "хочу посмотреть на hdrezka бетмэна",
+    "text": "хочу посмотреть на резка бетмэна",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 27,
-        "end": 34,
+        "start": 25,
+        "end": 32,
         "value": "бетмэна"
       }
     ]
@@ -4073,13 +3497,13 @@
     ]
   },
   {
-    "text": "найди на хдрезке фильм зеленая миля",
+    "text": "найди на резке фильм зеленая миля",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 23,
-        "end": 35,
+        "start": 21,
+        "end": 33,
         "value": "зеленая миля"
       }
     ]
@@ -4097,1265 +3521,1662 @@
     ]
   },
   {
-    "text": "открой hdrezka и включи фильм начало",
+    "text": "открой резку и включи фильм начало",
     "intent": "play_hdrezka",
     "entities": [
       {
         "entity": "movie_or_show",
-        "start": 30,
-        "end": 36,
+        "start": 28,
+        "end": 34,
         "value": "начало"
       }
     ]
   },
   {
-    "text": "слушай астра ты умеешь думать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "расскажи шутку",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай ты спишь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну не жалуюсь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "потихоньку",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра спасибо за помощь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи поболтаем",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну скоро сессия",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну мне скучно",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра все нормально братан",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну хорошего дня",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "как жизнь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра как жизнь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "поговори со мной",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи да так ничего особенного",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра все норм",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи где ты живешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи расскажи шутку",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра какая сегодня дата",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра все хорошо",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи что скажешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра хорошего дня",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай потихоньку",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "приятно познакомиться",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай все нормально братан",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ты спишь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи привет как дела",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра откуда ты",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй что скажешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну сколько будет два плюс два",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "что скажешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну как тебя зовут",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй да так ничего особенного",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай сколько будет два плюс два",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра какие новости",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй поговори со мной",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ты любишь котиков",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай поболтаем",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй какая твоя мечта",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра ты знала что сегодня праздник",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "что посоветуешь почитать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра ты кто такая",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай мне грустно",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй делаю проект",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай люблю тебя",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра ты любишь котиков",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй что делаешь вечером",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну хочу в отпуск",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи какое твое любимое блюдо",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи какая твоя мечта",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра тяжелый день был",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай какая у тебя любимая музыка",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ты кто такая",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра нормально",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра какое твое любимое блюдо",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "что делаешь вечером",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну давай пообщаемся",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну поболтаем",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну ты заменишь людей",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "как дела на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра ты смешная",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра у тебя есть друзья",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну откуда ты",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай расскажи стишок",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи посоветуй что посмотреть",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "у меня все отлично",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра расскажи интересную историю",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй какая у тебя любимая музыка",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра посоветуй фильм",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра делаю проект",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй какие новости",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи откуда ты",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "мне грустно",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй ты любишь котиков",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй расскажи интересную историю",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра потихоньку",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй в чем смысл жизни",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай сколько тебе лет",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй нормально",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра что скажешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай что такое любовь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "спокойной ночи",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай расскажи интересную историю",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ты робот",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи у меня все отлично",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра что такое любовь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра да так ничего особенного",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра где ты живешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи я пошел спать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра мне грустно",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи спасибо за помощь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну что посоветуешь почитать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай какие новости",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра все супер",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй что посоветуешь почитать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "увидимся позже",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра спокойной ночи",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи какая сегодня дата",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай скоро сессия",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай спасибо за помощь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй я пришел домой",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай кто твой хозяин",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра поговори со мной",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи ты кто такая",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра ты умеешь думать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра как тебя зовут",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра все нормально братан",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи как дела на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра ты робот",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра какая у тебя погода",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну ты любишь котиков",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй подними мне настроение",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну все супер",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "что нового",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну ты умеешь думать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй хочу в отпуск",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну как дела на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи какие новости",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра что думаешь про искусственный интеллект",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну да так ничего особенного",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра что думаешь про искусственный интеллект",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай нормально",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай привет как дела",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну расскажи что то интересное",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну какая твоя мечта",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра пока пока",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "какая твоя мечта",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай ты лучшая",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра станцуй что нибудь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "все супер",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай я пришел домой",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра поговори со мной",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра да пойдет",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну ты смешная",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну кто тебя создал",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "до связи",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну почему небо синее",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну ты молодец",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй хорошего дня",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну что такое любовь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "станцуй что нибудь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй как пройти в библиотеку",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй поболтаем",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай что делаешь вечером",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра я устал",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра станцуй что нибудь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну что делаешь вечером",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра скоро сессия",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи какая у тебя погода",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй мне грустно",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи учусь в университете",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи что думаешь про искусственный интеллект",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра привет как дела",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну ты веришь в инопланетян",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "откуда ты",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи скоро сессия",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра что нового",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи делаю проект",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй какой твой любимый цвет",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай пока пока",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну добрый вечер",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра доброе утро",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй как тебя зовут",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй что ты думаешь о людях",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай как жизнь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "что ты думаешь о людях",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра подними мне настроение",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй чем увлекаешься",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну как настроение",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай ты кто такая",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй у тебя есть друзья",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй не жалуюсь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "доброе утро",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра как настроение",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скорее бы выходные",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи что посоветуешь почитать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра какая у тебя погода",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай ты робот",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "я на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай какой сегодня день",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну все норм",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "какие новости",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра мне скучно",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра ты лучшая",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай ты заменишь людей",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра как пройти в библиотеку",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи пишу диплом",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй расскажи анекдот",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи подними мне настроение",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай ты любишь котиков",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай скорее бы выходные",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй ты знала что сегодня праздник",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "поболтаем",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай какая твоя мечта",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй как дела на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай все хорошо",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра сколько будет два плюс два",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра скоро сессия",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра расскажи что то интересное",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи я на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну да пойдет",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра нормально",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну сколько тебе лет",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра люблю тебя",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй ты умеешь думать",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "делаю проект",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну что ты умеешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй что нового",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра ты веришь в инопланетян",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй ты спишь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "где ты живешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай добрый вечер",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра я на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй привет как дела",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай как настроение",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну посоветуй что посмотреть",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну что думаешь про искусственный интеллект",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай что скажешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи доброе утро",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи как жизнь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра чем занимаешься",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай что ты умеешь",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра доброе утро",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "да пойдет",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра что ты думаешь о людях",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну учусь в университете",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи какой сегодня день",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй приятно познакомиться",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "расскажи анекдот",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра до связи",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра хочу в отпуск",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра учусь в университете",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну чем увлекаешься",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай какое твое любимое блюдо",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "все норм",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну что ты думаешь о людях",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй какая у тебя погода",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну все хорошо",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи поговори со мной",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай я на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра кто тебя создал",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра пока пока",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра как дела на работе",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "скажи посоветуй фильм",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай астра до связи",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "астра у меня все отлично",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "слушай все норм",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "ну увидимся позже",
-    "intent": "chat",
-    "entities": []
-  },
-  {
-    "text": "эй давай пообщаемся",
-    "intent": "chat",
-    "entities": []
-  },
+    "text": "включи группу кино в спотифай",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 14,
+        "end": 18,
+        "value": "кино"
+      },
+      {
+        "entity": "service",
+        "start": 21,
+        "end": 29,
+        "value": "спотифай"
+      }
+    ]
+  },
+  {
+    "text": "поставь трек кукушка",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 13,
+        "end": 20,
+        "value": "кукушка"
+      }
+    ]
+  },
+  {
+    "text": "яндекс музыка найди арию",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 13,
+        "value": "яндекс музыка"
+      },
+      {
+        "entity": "artist",
+        "start": 20,
+        "end": 24,
+        "value": "арию"
+      }
+    ]
+  },
+  {
+    "text": "спотифай включи би 2",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 8,
+        "value": "спотифай"
+      },
+      {
+        "entity": "artist",
+        "start": 16,
+        "end": 20,
+        "value": "би 2"
+      }
+    ]
+  },
+  {
+    "text": "найди песню смуглянка на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 12,
+        "end": 21,
+        "value": "смуглянка"
+      },
+      {
+        "entity": "service",
+        "start": 25,
+        "end": 38,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "вруби рамштайн на спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 6,
+        "end": 14,
+        "value": "рамштайн"
+      },
+      {
+        "entity": "service",
+        "start": 18,
+        "end": 25,
+        "value": "спотике"
+      }
+    ]
+  },
   {
-    "text": "слушай как дела на работе",
-    "intent": "chat",
-    "entities": []
+    "text": "поставь группу крови в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 13,
+        "end": 24,
+        "value": "группа крови"
+      },
+      {
+        "entity": "service",
+        "start": 23,
+        "end": 30,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "вруби музон",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "давай музыку",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "найди песню в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 14,
+        "end": 22,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "хочу послушать сплин на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 15,
+        "end": 20,
+        "value": "сплин"
+      },
+      {
+        "entity": "service",
+        "start": 24,
+        "end": 37,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "включи трек белые розы на спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 12,
+        "end": 22,
+        "value": "белые розы"
+      },
+      {
+        "entity": "service",
+        "start": 26,
+        "end": 33,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "поставь металлику",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 8,
+        "end": 17,
+        "value": "металлику"
+      }
+    ]
+  },
+  {
+    "text": "найди песню лесник",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 12,
+        "end": 18,
+        "value": "лесник"
+      }
+    ]
+  },
+  {
+    "text": "вруби рок",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "яндекс музыка включи майкл джексон",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 13,
+        "value": "яндекс музыка"
+      },
+      {
+        "entity": "artist",
+        "start": 21,
+        "end": 34,
+        "value": "майкл джексон"
+      }
+    ]
+  },
+  {
+    "text": "поставь в яндексе группу ария",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 10,
+        "end": 17,
+        "value": "яндексе"
+      },
+      {
+        "entity": "artist",
+        "start": 25,
+        "end": 29,
+        "value": "ария"
+      }
+    ]
+  },
+  {
+    "text": "сыграй песню в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 15,
+        "end": 23,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "хочу музыку",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "найди трек звезда по имени солнце на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 11,
+        "end": 33,
+        "value": "звезда по имени солнце"
+      },
+      {
+        "entity": "service",
+        "start": 37,
+        "end": 50,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "вруби арию в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 6,
+        "end": 10,
+        "value": "арию"
+      },
+      {
+        "entity": "service",
+        "start": 13,
+        "end": 20,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "поставь трек в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 15,
+        "end": 23,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "давай послушаем нюшу на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 16,
+        "end": 20,
+        "value": "нюшу"
+      },
+      {
+        "entity": "service",
+        "start": 24,
+        "end": 37,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "включи песню группы кино",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 20,
+        "end": 24,
+        "value": "кино"
+      }
+    ]
+  },
+  {
+    "text": "найди трек в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 13,
+        "end": 20,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "сыграй трек на спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 15,
+        "end": 22,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "включи группу queen",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 14,
+        "end": 19,
+        "value": "queen"
+      }
+    ]
+  },
+  {
+    "text": "яндекс музыка трек",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 13,
+        "value": "яндекс музыка"
+      }
+    ]
+  },
+  {
+    "text": "найди песню на спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 15,
+        "end": 23,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "поставь группу крови на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 13,
+        "end": 24,
+        "value": "группа крови"
+      },
+      {
+        "entity": "service",
+        "start": 24,
+        "end": 37,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "включи би 2 на спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 7,
+        "end": 11,
+        "value": "би 2"
+      },
+      {
+        "entity": "service",
+        "start": 15,
+        "end": 22,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "найди трек немо",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 11,
+        "end": 15,
+        "value": "немо"
+      }
+    ]
+  },
+  {
+    "text": "вруби группу слипкнот в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 13,
+        "end": 21,
+        "value": "слипкнот"
+      },
+      {
+        "entity": "service",
+        "start": 24,
+        "end": 32,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "поставь песню на яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 17,
+        "end": 24,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "включи музыку",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "найди трек кукушка на спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 11,
+        "end": 18,
+        "value": "кукушка"
+      },
+      {
+        "entity": "service",
+        "start": 22,
+        "end": 29,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "яндекс музыка включи песню группы сплин",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 13,
+        "value": "яндекс музыка"
+      },
+      {
+        "entity": "artist",
+        "start": 34,
+        "end": 39,
+        "value": "сплин"
+      }
+    ]
+  },
+  {
+    "text": "вруби трек на спотифе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 14,
+        "end": 21,
+        "value": "спотифе"
+      }
+    ]
+  },
+  {
+    "text": "давай рок на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 13,
+        "end": 26,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "поставь в спотифае группу кисс",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 10,
+        "end": 18,
+        "value": "спотифае"
+      },
+      {
+        "entity": "artist",
+        "start": 26,
+        "end": 30,
+        "value": "кисс"
+      }
+    ]
+  },
+  {
+    "text": "найди песню в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 14,
+        "end": 21,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "спотик включи арию",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 6,
+        "value": "спотик"
+      },
+      {
+        "entity": "artist",
+        "start": 14,
+        "end": 18,
+        "value": "арию"
+      }
+    ]
+  },
+  {
+    "text": "хочу послушать музыку",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "яндекс музыка трек группы крови",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 13,
+        "value": "яндекс музыка"
+      },
+      {
+        "entity": "track",
+        "start": 19,
+        "end": 31,
+        "value": "группы крови"
+      }
+    ]
+  },
+  {
+    "text": "вруби песню в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 14,
+        "end": 21,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "найди трек смуглянка в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 11,
+        "end": 20,
+        "value": "смуглянка"
+      },
+      {
+        "entity": "service",
+        "start": 23,
+        "end": 30,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "включи группы queen в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 14,
+        "end": 19,
+        "value": "queen"
+      },
+      {
+        "entity": "service",
+        "start": 22,
+        "end": 30,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "давай послушаем",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "яндекс музыка включи трек кукушка",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 13,
+        "value": "яндекс музыка"
+      },
+      {
+        "entity": "track",
+        "start": 26,
+        "end": 33,
+        "value": "кукушка"
+      }
+    ]
+  },
+  {
+    "text": "спотик включи песню",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 6,
+        "value": "спотик"
+      }
+    ]
+  },
+  {
+    "text": "найди трек в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 13,
+        "end": 21,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "включи группу би 2 в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 14,
+        "end": 18,
+        "value": "би 2"
+      },
+      {
+        "entity": "service",
+        "start": 21,
+        "end": 28,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "поставь трек на яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 16,
+        "end": 23,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "сыграй арию на spotify",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 7,
+        "end": 11,
+        "value": "арию"
+      },
+      {
+        "entity": "service",
+        "start": 15,
+        "end": 22,
+        "value": "spotify"
+      }
+    ]
+  },
+  {
+    "text": "включи музыку в яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 16,
+        "end": 29,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "найди группу кино",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 13,
+        "end": 17,
+        "value": "кино"
+      }
+    ]
+  },
+  {
+    "text": "включи мою волну в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 19,
+        "end": 26,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "включи мою волну на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 20,
+        "end": 33,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "запусти мою волну",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "вруби мою волну",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "яндекс музыка включи мою волну",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 0,
+        "end": 13,
+        "value": "яндекс музыка"
+      }
+    ]
+  },
+  {
+    "text": "мою волну давай",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "включи мою волну",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "запусти мою волну на яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 21,
+        "end": 28,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "вруби мою волну на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 19,
+        "end": 32,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "давай мою волну",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "сыграй мою волну на яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 20,
+        "end": 27,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "мою волну включи",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "включи волну",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "моя волна в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 12,
+        "end": 19,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "поставь мою волну",
+    "intent": "play_music",
+    "entities": []
+  },
+  {
+    "text": "включи-ка би-2",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 10,
+        "end": 14,
+        "value": "би-2"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка песенку кукушка",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 19,
+        "end": 26,
+        "value": "кукушка"
+      }
+    ]
+  },
+  {
+    "text": "сыграй-ка рамиштейна",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 10,
+        "end": 20,
+        "value": "рамиштейна"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка тречок белые розы",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 16,
+        "end": 26,
+        "value": "белые розы"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка квинов",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 9,
+        "end": 15,
+        "value": "квинов"
+      }
+    ]
+  },
+  {
+    "text": "включи-ка песенку группы кино",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 25,
+        "end": 29,
+        "value": "кино"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка тречек смуглянка",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 18,
+        "end": 27,
+        "value": "смуглянка"
+      }
+    ]
+  },
+  {
+    "text": "запусти-ка металлику",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 11,
+        "end": 20,
+        "value": "металлику"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка песенку лесник",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 23,
+        "value": "лесник"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка арию",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 9,
+        "end": 13,
+        "value": "арию"
+      }
+    ]
+  },
+  {
+    "text": "сыграй-ка тречок ин зе энд",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 26,
+        "value": "ин зе энд"
+      }
+    ]
+  },
+  {
+    "text": "включи-ка группы квин",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 17,
+        "end": 21,
+        "value": "квин"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка песню сплин",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 17,
+        "end": 22,
+        "value": "сплин"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка рамиштейна в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 9,
+        "end": 19,
+        "value": "рамиштейна"
+      },
+      {
+        "entity": "service",
+        "start": 22,
+        "end": 29,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка песенку группы крови",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 29,
+        "value": "группы крови"
+      }
+    ]
+  },
+  {
+    "text": "включи-ка би-2 на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 10,
+        "end": 14,
+        "value": "би-2"
+      },
+      {
+        "entity": "service",
+        "start": 18,
+        "end": 31,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка тречок билли джин",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 18,
+        "end": 28,
+        "value": "билли джин"
+      }
+    ]
+  },
+  {
+    "text": "сыграй-ка майкла",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 10,
+        "end": 16,
+        "value": "майкла"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка песенку в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 19,
+        "end": 27,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "запусти-ка кисс на споти",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 11,
+        "end": 15,
+        "value": "кисс"
+      },
+      {
+        "entity": "service",
+        "start": 19,
+        "end": 24,
+        "value": "споти"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка тречек звезда по имени солнце",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 16,
+        "end": 38,
+        "value": "звезда по имени солнце"
+      }
+    ]
+  },
+  {
+    "text": "включи-ка рамиштейна в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 10,
+        "end": 20,
+        "value": "рамиштейна"
+      },
+      {
+        "entity": "service",
+        "start": 23,
+        "end": 30,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка нюшу на спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 11,
+        "end": 15,
+        "value": "нюшу"
+      },
+      {
+        "entity": "service",
+        "start": 19,
+        "end": 26,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "сыграй-ка тречек кукушка на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 24,
+        "value": "кукушка"
+      },
+      {
+        "entity": "service",
+        "start": 28,
+        "end": 41,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка металлику в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 9,
+        "end": 18,
+        "value": "металлику"
+      },
+      {
+        "entity": "service",
+        "start": 21,
+        "end": 29,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка песенку смуглянка",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 26,
+        "value": "смуглянка"
+      }
+    ]
+  },
+  {
+    "text": "запусти-ка квинов в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 11,
+        "end": 17,
+        "value": "квинов"
+      },
+      {
+        "entity": "service",
+        "start": 20,
+        "end": 28,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "включи-ка тречек он зе флур",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 27,
+        "value": "он зе флур"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка группу арию в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 18,
+        "end": 22,
+        "value": "арию"
+      },
+      {
+        "entity": "service",
+        "start": 25,
+        "end": 32,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка песенку группы крови",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 29,
+        "value": "группы крови"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка тречек в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 18,
+        "end": 25,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "сыграй-ка белые розы на яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 10,
+        "end": 20,
+        "value": "белые розы"
+      },
+      {
+        "entity": "service",
+        "start": 24,
+        "end": 31,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка рамиштейна на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 11,
+        "end": 21,
+        "value": "рамиштейна"
+      },
+      {
+        "entity": "service",
+        "start": 25,
+        "end": 38,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка майкла джексона",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 9,
+        "end": 24,
+        "value": "майкла джексона"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка песенку в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 19,
+        "end": 26,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "запусти-ка металлику в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 11,
+        "end": 20,
+        "value": "металлику"
+      },
+      {
+        "entity": "service",
+        "start": 23,
+        "end": 30,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "включи-ка тречек смуглянка на спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 26,
+        "value": "смуглянка"
+      },
+      {
+        "entity": "service",
+        "start": 30,
+        "end": 37,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка квинов в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 11,
+        "end": 17,
+        "value": "квинов"
+      },
+      {
+        "entity": "service",
+        "start": 20,
+        "end": 28,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка песенку лесник на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 23,
+        "value": "лесник"
+      },
+      {
+        "entity": "service",
+        "start": 27,
+        "end": 40,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка би-2 в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 9,
+        "end": 13,
+        "value": "би-2"
+      },
+      {
+        "entity": "service",
+        "start": 16,
+        "end": 23,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "сыграй-ка тречек группы крови",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 17,
+        "end": 29,
+        "value": "группы крови"
+      }
+    ]
+  },
+  {
+    "text": "запусти-ка нюшу в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 11,
+        "end": 15,
+        "value": "нюшу"
+      },
+      {
+        "entity": "service",
+        "start": 18,
+        "end": 25,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка тречек в spotify",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 20,
+        "end": 27,
+        "value": "spotify"
+      }
+    ]
+  },
+  {
+    "text": "вруби-ка арию в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 9,
+        "end": 13,
+        "value": "арию"
+      },
+      {
+        "entity": "service",
+        "start": 16,
+        "end": 24,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка песенку на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 20,
+        "end": 33,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "запусти-ка тречек кукушка в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 18,
+        "end": 25,
+        "value": "кукушка"
+      },
+      {
+        "entity": "service",
+        "start": 28,
+        "end": 35,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка песенку белые розы на яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "track",
+        "start": 19,
+        "end": 29,
+        "value": "белые розы"
+      },
+      {
+        "entity": "service",
+        "start": 33,
+        "end": 40,
+        "value": "яндексе"
+      }
+    ]
+  },
+  {
+    "text": "давай-ка металлику в спотифае",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 9,
+        "end": 18,
+        "value": "металлику"
+      },
+      {
+        "entity": "service",
+        "start": 21,
+        "end": 29,
+        "value": "спотифае"
+      }
+    ]
+  },
+  {
+    "text": "запусти-ка группу кисс на яндекс музыке",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "artist",
+        "start": 18,
+        "end": 22,
+        "value": "кисс"
+      },
+      {
+        "entity": "service",
+        "start": 26,
+        "end": 39,
+        "value": "яндекс музыке"
+      }
+    ]
+  },
+  {
+    "text": "включи-ка тречек в спотике",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 19,
+        "end": 26,
+        "value": "спотике"
+      }
+    ]
+  },
+  {
+    "text": "поставь-ка песенку в яндексе",
+    "intent": "play_music",
+    "entities": [
+      {
+        "entity": "service",
+        "start": 21,
+        "end": 28,
+        "value": "яндексе"
+      }
+    ]
   }
 ]
