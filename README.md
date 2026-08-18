@@ -75,6 +75,28 @@ Each training run generates reports in the `results/` folder:
 
 ---
 
+## 🙏 Special Thanks
+
+I want to express my sincere gratitude to the companies and teams that made this project possible:
+
+---
+
+### 🏦 Sberbank
+
+Huge thanks to **Sberbank** for providing:
+
+- **The dataset** for training emotion and intent recognition models — high-quality labeled data became the foundation for all research work.
+- **The Wav2Vec2 Russian model** — a powerful transformer that I use as a **Teacher model** in the knowledge distillation process. Thanks to this model, my lightweight CRNN architecture inherits deep speech patterns while maintaining high inference speed.
+
+---
+
+### 🎙️ Silero
+
+Special thanks to the **Silero** team for:
+
+- **Speech synthesis models** and **voice models** that have become an integral part of the "Astra" voice assistant.
+- High-quality and natural-sounding synthesis, available even for local use, which allows Astra to sound lively and human-like.
+
 ---
 
 # 🧪 Астра: Лаборатория Исследований
@@ -149,3 +171,29 @@ ml_research/
 - **Metrics Summary** — файлы с итоговой точностью (Accuracy) и F1-score для каждой модели.
 
 ✨ Проект активно развивается.
+
+---
+
+## 🙏 Особая благодарность
+
+Хочу выразить искреннюю благодарность компаниям и командам, которые сделали этот проект возможным:
+
+---
+
+### 🏦 Сбербанк
+
+Выражаю огромную благодарность **Сбербанку** за предоставление:
+
+- **Датасета** для обучения моделей распознавания эмоций и намерений — качественные размеченные данные стали фундаментом для всей исследовательской работы.
+- **Модели Wav2Vec2 Russian** — мощного трансформера, который я использую как **Teacher-модель** в процессе дистилляции знаний. Благодаря этой модели моя лёгкая CRNN-архитектура перенимает глубокие паттерны речи, сохраняя при этом высокую скорость работы.
+
+---
+
+### 🎙️ Silero
+
+Отдельное спасибо команде **Silero** за:
+
+- **Модели синтеза речи** и **голосовые модели**, которые стали неотъемлемой частью голосового ассистента «Астра».  
+- Высококачественный и естественный синтез, доступный даже для локального использования, что позволяет Астре звучать живо и человечно.
+
+---
