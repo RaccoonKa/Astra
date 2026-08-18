@@ -12,15 +12,21 @@ from PIL import ImageGrab
 import pyautogui
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL, CoInitialize
-from services.wikipedia_manager import WikipediaManager
+from services.wikipedia.wikipedia_manager import WikipediaManager
 from services.yandex.yandex_music_manager import YandexMusicManager
 from services.google.youtube_manager import YouTubeManager
+from services.spotify.spotify_manager import SpotifyManager
+from services.zapret.zapret import ZapretManager
+from services.vpn.vpn_manager import VpnManager
 
 pyautogui.FAILSAFE = False
 
 wiki_manager = WikipediaManager()
 ym_manager = YandexMusicManager()
 yt_manager = YouTubeManager()
+spotify_manager = SpotifyManager()
+zapret_manager = ZapretManager()
+vpn_manager = VpnManager()
 
 MUSIC_PHRASES = [
     "Твоя музыка заставляет меня работать быстрее.",
@@ -44,6 +50,12 @@ def _load_config():
         except Exception:
             pass
     return {}
+
+
+def _is_spotify_active():
+    cfg = _load_config()
+    return cfg.get("music_service") == "spotify" or cfg.get("use_spotify", False)
+
 
 def extract_number(text=""):
     digits = re.findall(r'\d+', text)
@@ -230,6 +242,51 @@ def to_prepositional(name):
 
 class SystemActions:
     @staticmethod
+    def is_wave_request(query_clean):
+        if not query_clean:
+            return True
+        wave_exact = {
+            "мою волну", "моя волна", "свою волну", "своя волна", "волну", "волна",
+            "волны", "волне", "мои ладно", "мою ладно", "моя ладно", "мою главного",
+            "моя главная", "любимое", "любимую", "любимый", "любимые", "любимые треки",
+            "понравившееся", "понравившиеся", "рекомендации", "микс", "поток", "радио"
+        }
+        return query_clean.strip() in wave_exact
+
+    @staticmethod
+    def clean_music_query(text="", slots=None):
+        query = ""
+        if slots:
+            query = slots.get("track") or slots.get("artist") or slots.get("song") or ""
+
+        if not query:
+            query = text
+
+        query_low = query.lower()
+
+        service_patterns = [
+            r'\b(?:в|во|на|через|по|из|с|со|для)?\s*(?:спотифа(?:й|я|ю|ем|е|йчик|йчика|йчику|йчиком|йчике)|споти(?:к|ка|ку|ком|ке|ках)?|spotify|споти)\b',
+            r'\b(?:в|во|на|через|по|из|с|со|для)?\s*(?:яндекс(?:\s*музык(?:е|у|а|ой|и))?|яндексе|яндекса|яндексу|яндексом|yandex(?:\s*music)?)\b'
+        ]
+        for pat in service_patterns:
+            query_low = re.sub(pat, '', query_low, flags=re.IGNORECASE)
+
+        stop_words = [
+            r'\bвключи(?:те)?\b', r'\bпоставь(?:те)?\b', r'\bнайди(?:те)?\b',
+            r'\bпокажи(?:те)?\b', r'\bоткрой(?:те)?\b', r'\bсыграй(?:те)?\b',
+            r'\bзапусти(?:те)?\b', r'\bвруби(?:те)?\b', r'\bпроиграй(?:те)?\b',
+            r'\bпесн(?:я|ю|и|ей|ям)?\b', r'\bтрек(?:а|у|ом|е|и|ов)?\b',
+            r'\bмузык(?:а|у|и|ой|е)?\b', r'\bмузл(?:о|а|у|ом)?\b',
+            r'\bмне\b', r'\bнам\b', r'\bпожалуйста\b', r'\bбыстро\b',
+            r'\bгрупп(?:а|у|ы|ой|е)\b', r'\bальбом(?:а|у|ом|е)?\b',
+            r'\bисполнител(?:ь|я|ю|ем|е)\b', r'\bастра\b', r'\bастру\b', r'\bастро\b'
+        ]
+        for sw in stop_words:
+            query_low = re.sub(sw, '', query_low, flags=re.IGNORECASE)
+
+        return re.sub(r'\s+', ' ', query_low).strip()
+
+    @staticmethod
     def handle_gesture(gesture_name):
         if gesture_name == "victory":
             return SystemActions.shutdown_pc()
@@ -254,8 +311,13 @@ class SystemActions:
         return "Перевожу компьютер в спящий режим"
 
     @staticmethod
-    def shutdown_pc():
+    def shutdown_pc(text=""):
+        text_low = text.lower() if text else ""
         os.system("shutdown /s /t 5")
+        if "спокойной ночи" in text_low or "доброй ночи" in text_low:
+            return "Сладких снов!"
+        if any(w in text_low for w in ["пока", "до свидания", "до встречи", "до завтра", "бай"]):
+            return "До скорого!"
         return "Выключаю ПК через пять секунд"
 
     @staticmethod
@@ -304,40 +366,95 @@ class SystemActions:
         return wiki_manager.search(query)
 
     @staticmethod
-    def open_yandex_music(text=""):
-        stop_words = ["включи", "поставь", "найди", "покажи", "открой", "на яндекс музыке", "в яндекс музыке", "яндекс музыку", "песню", "трек", "мне"]
-        query = text.lower()
-        for word in stop_words:
-            query = query.replace(word, "")
-        query = query.strip()
+    def play_music(text="", slots=None):
+        text_low = text.lower() if text else ""
+        spotify_keywords = [
+            "спотифай", "спотифая", "спотифаю", "спотифаем", "спотифае",
+            "спотик", "спотика", "спотику", "спотиком", "спотике",
+            "споти", "spotify"
+        ]
+        yandex_keywords = [
+            "яндекс", "яндексе", "яндекса", "яндексу", "яндексом", "yandex"
+        ]
 
-        if not query:
-            if ym_manager.play_my_wave():
+        has_spotify = any(w in text_low for w in spotify_keywords)
+        has_yandex = any(w in text_low for w in yandex_keywords)
+
+        if has_spotify and not has_yandex:
+            return SystemActions.play_spotify(text=text, slots=slots)
+        elif has_yandex and not has_spotify:
+            return SystemActions.open_yandex_music(text=text, slots=slots, force_yandex=True)
+        else:
+            if _is_spotify_active():
+                return SystemActions.play_spotify(text=text, slots=slots)
+            else:
+                return SystemActions.open_yandex_music(text=text, slots=slots, force_yandex=True)
+
+    @staticmethod
+    def open_yandex_music(text="", slots=None, force_yandex=False):
+        text_low = text.lower() if text else ""
+        spotify_keywords = [
+            "спотифай", "спотифая", "спотифаю", "спотифаем", "спотифае",
+            "спотик", "спотика", "спотику", "спотиком", "спотике",
+            "споти", "spotify"
+        ]
+        yandex_keywords = [
+            "яндекс", "яндексе", "яндекса", "яндексу", "яндексом", "yandex"
+        ]
+
+        if not force_yandex:
+            if any(w in text_low for w in spotify_keywords):
+                return SystemActions.play_spotify(text=text, slots=slots)
+            if not any(w in text_low for w in yandex_keywords) and _is_spotify_active():
+                return SystemActions.play_spotify(text=text, slots=slots)
+
+        query = SystemActions.clean_music_query(text, slots)
+
+        if not query or SystemActions.is_wave_request(query):
+            res = ym_manager.play_my_wave()
+            if isinstance(res, str):
+                return res
+            if res is True:
                 return random.choice(MUSIC_PHRASES)
             return "Не удалось запустить Мою волну"
 
         res = ym_manager.play_query(query)
-        return res
+        if "VLC Player" in res or "токен" in res:
+            return res
+
+        return random.choice([
+            f"Включаю {query.title()} на Яндекс Музыке",
+            random.choice(MUSIC_PHRASES)
+        ])
 
     @staticmethod
     def stop_music(text=""):
         ym_manager.stop()
+        spotify_manager.stop()
         return "Выключаю музыку"
 
     @staticmethod
     def like_yandex_track(text=""):
-        ym_manager.like_current()
+        if _is_spotify_active():
+            spotify_manager.like_current()
+        else:
+            ym_manager.like_current()
         return ""
 
     @staticmethod
     def unlike_yandex_track(text=""):
-        ym_manager.unlike_current()
+        if _is_spotify_active():
+            spotify_manager.unlike_current()
+        else:
+            ym_manager.unlike_current()
         return ""
 
     @staticmethod
     def open_spotify():
-        webbrowser.open("https://open.spotify.com")
-        return "Открываю Спотифай"
+        if spotify_manager._is_spotify_installed():
+            if spotify_manager._launch_app():
+                return "Открываю Спотифай"
+        return "Прости, я не нашла на твоем ПК Спотик! Установи приложение, и я сразу включу музыку."
 
     @staticmethod
     def open_github():
@@ -370,18 +487,37 @@ class SystemActions:
 
     @staticmethod
     def open_vpn():
-        subprocess.Popen(["cmd", "/c", "start", "sota-vpn:"], shell=True)
-        return "Запускаю Sota VPN"
+        return vpn_manager.connect()
+
+    @staticmethod
+    def start_vpn(text="", slots=None):
+        specific = vpn_manager.parse_vpn_name(text) if text else "none"
+        if specific != "none":
+            return vpn_manager.connect(specific)
+        return vpn_manager.connect()
+
+    @staticmethod
+    def stop_vpn(text="", slots=None):
+        specific = vpn_manager.parse_vpn_name(text) if text else "none"
+        if specific != "none":
+            return vpn_manager.disconnect(specific)
+        return vpn_manager.disconnect()
 
     @staticmethod
     def open_media_player():
+        if _is_spotify_active():
+            if spotify_manager.play_my_wave():
+                return random.choice(MUSIC_PHRASES)
+            return "Открываю Spotify"
         if ym_manager.play_my_wave():
             return random.choice(MUSIC_PHRASES)
         return "Открываю медиаплеер"
 
     @staticmethod
     def media_play_pause():
-        if ym_manager.player and ym_manager.player.is_playing():
+        if _is_spotify_active():
+            spotify_manager.toggle_pause()
+        elif ym_manager.player and ym_manager.player.is_playing():
             ym_manager.toggle_pause()
         else:
             pyautogui.press('k')
@@ -389,7 +525,9 @@ class SystemActions:
 
     @staticmethod
     def media_next_track():
-        if ym_manager.player and ym_manager.player.is_playing():
+        if _is_spotify_active():
+            spotify_manager.next_track()
+        elif ym_manager.player and ym_manager.player.is_playing():
             ym_manager.next_track()
         else:
             pyautogui.hotkey('shift', 'n')
@@ -402,14 +540,43 @@ class SystemActions:
 
     @staticmethod
     def media_previous_track():
-        ym_manager.prev_track()
+        if _is_spotify_active():
+            spotify_manager.prev_track()
+        else:
+            ym_manager.prev_track()
         return ""
 
     @staticmethod
-    def play_yandex_favorites(text=""):
-        if ym_manager.play_my_wave():
-            return random.choice(MUSIC_PHRASES)
-        return "Не удалось запустить Мою волну"
+    def play_yandex_favorites(text="", slots=None):
+        return SystemActions.play_music(text=text, slots=slots)
+
+    @staticmethod
+    def play_spotify(text="", slots=None):
+        if not spotify_manager._is_spotify_installed():
+            return "Прости, я не нашла на твоем ПК Спотик! Установи приложение, и я сразу включу музыку."
+
+        query = SystemActions.clean_music_query(text, slots)
+
+        if not query or SystemActions.is_wave_request(query):
+            res = spotify_manager.play_my_wave()
+            if res is True:
+                return random.choice(MUSIC_PHRASES)
+            elif isinstance(res, str):
+                return res
+            return "Не удалось запустить Spotify"
+
+        res = spotify_manager.play_query(query)
+        if res.startswith("Укажи client_id") or res.startswith("Прости, я не нашла"):
+            return res
+
+        return random.choice([
+            f"Включаю {query.title()} в Spotify",
+            random.choice(MUSIC_PHRASES)
+        ])
+
+    @staticmethod
+    def stop_spotify(text=""):
+        return spotify_manager.stop()
 
     @staticmethod
     def take_screenshot():
@@ -543,51 +710,6 @@ class SystemActions:
         return "Включаю звук"
 
     @staticmethod
-    def normalize_query_case(query_text):
-        if not query_text:
-            return ""
-
-        try:
-            import pymorphy3
-            morph = pymorphy3.MorphAnalyzer()
-            words = query_text.split()
-            normalized = []
-            for w in words:
-                parsed = morph.parse(w)
-                if parsed:
-                    normalized.append(parsed[0].normal_form)
-                else:
-                    normalized.append(w)
-            return " ".join(normalized)
-        except Exception:
-            try:
-                import pymorphy2
-                morph = pymorphy2.MorphAnalyzer()
-                words = query_text.split()
-                normalized = []
-                for w in words:
-                    parsed = morph.parse(w)
-                    if parsed:
-                        normalized.append(parsed[0].normal_form)
-                    else:
-                        normalized.append(w)
-                return " ".join(normalized)
-            except Exception:
-                words = query_text.split()
-                cleaned = []
-                for w in words:
-                    if len(w) > 3:
-                        if w.endswith(("ом", "ем", "ам", "ях")):
-                            cleaned.append(w[:-2])
-                        elif w.endswith(("а", "я", "у", "ю", "е", "и")):
-                            cleaned.append(w[:-1])
-                        else:
-                            cleaned.append(w)
-                    else:
-                        cleaned.append(w)
-                return " ".join(cleaned)
-
-    @staticmethod
     def play_hdrezka(text="", slots=None):
         query = None
         if slots and "movie_or_show" in slots:
@@ -600,9 +722,6 @@ class SystemActions:
             for word in stop_words:
                 query = query.replace(word, "")
             query = query.strip()
-
-        if query:
-            query = SystemActions.normalize_query_case(query)
 
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         config_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
@@ -639,26 +758,19 @@ class SystemActions:
                 query = query.replace(word, "")
             query = query.strip()
 
-        if query:
-            query = SystemActions.normalize_query_case(query)
-
         return yt_manager.search_and_play(query)
 
     @staticmethod
     def mode_work(text=""):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-        apps = []
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    apps = data.get("work_apps", [])
-            except Exception:
-                pass
+        cfg = _load_config()
+        apps = cfg.get("work_apps", [])
+        if isinstance(apps, str):
+            apps = [x.strip() for x in apps.split(",") if x.strip()]
         if not apps:
             apps = ["https://github.com"]
+
         for item in apps:
+            item = item.strip()
             if item.startswith("http://") or item.startswith("https://"):
                 webbrowser.open(item)
             else:
@@ -670,19 +782,15 @@ class SystemActions:
 
     @staticmethod
     def mode_rest(text=""):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-        apps = []
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    apps = data.get("rest_apps", [])
-            except Exception:
-                pass
+        cfg = _load_config()
+        apps = cfg.get("rest_apps", [])
+        if isinstance(apps, str):
+            apps = [x.strip() for x in apps.split(",") if x.strip()]
         if not apps:
             apps = ["https://youtube.com"]
+
         for item in apps:
+            item = item.strip()
             if item.startswith("http://") or item.startswith("https://"):
                 webbrowser.open(item)
             else:
@@ -714,6 +822,18 @@ class SystemActions:
         cpu = number_to_words(psutil.cpu_percent())
         ram = number_to_words(psutil.virtual_memory().percent)
         return f"Загрузка процессора {cpu} процентов, оперативная память заполнена на {ram} процентов"
+
+    @staticmethod
+    def start_zapret(text=""):
+        menu = zapret_manager.get_strategies_menu()
+        return {
+            "chat": f"Список доступных вариантов обхода:\n\n{menu}\n\nНазови или введи номер нужного обхода (от 1 до 20):",
+            "voice": "Вывела список обходов в чат. Назови или введи номер нужного варианта."
+        }
+
+    @staticmethod
+    def stop_zapret(text=""):
+        return zapret_manager.stop()
 
     @staticmethod
     def get_weather(text="", slots=None):

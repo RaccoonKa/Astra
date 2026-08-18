@@ -1,14 +1,16 @@
 import os
 import math
 import random
+import atexit
 import warnings
+import threading
 import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QFrame, QGraphicsOpacityEffect
+    QTextEdit, QLineEdit, QFrame
 )
 from PyQt6.QtCore import (
-    Qt, QPoint, QRectF, QTimer, QPropertyAnimation,
+    Qt, QPoint, QRectF, QTimer, QPropertyAnimation, QVariantAnimation,
     QEasingCurve, QParallelAnimationGroup, QThread, pyqtSignal
 )
 from PyQt6.QtGui import (
@@ -24,7 +26,7 @@ from core.system.actions import SystemActions
 from core.vision.vision_provider import VisionThread
 from core.vision.presence_manager import PresenceManager
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
-from comtypes import CoInitialize
+from comtypes import CoInitialize, CoUninitialize
 
 warnings.filterwarnings("ignore", message="data discontinuity in recording")
 
@@ -35,51 +37,72 @@ class AudioVisualizerWorker(QThread):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.running = True
+        self.peak_level = 0.02
 
     def run(self):
-        try:
-            import soundcard as sc
-            import warnings
+        import soundcard as sc
+        warnings.filterwarnings("ignore", category=sc.SoundcardRuntimeWarning)
 
-            warnings.filterwarnings("ignore", category=sc.SoundcardRuntimeWarning)
+        while self.running:
+            try:
+                default_speaker = sc.default_speaker()
+                if not default_speaker:
+                    self.msleep(300)
+                    continue
 
-            default_speaker = sc.default_speaker()
-            mic = sc.get_microphone(default_speaker.id, include_loopback=True)
+                try:
+                    mic = sc.get_microphone(default_speaker.id, include_loopback=True)
+                except Exception:
+                    mic = None
 
-            with mic.recorder(samplerate=44100) as recorder:
-                while self.running:
-                    data = recorder.record(numframes=2048)
+                if not mic:
+                    loopbacks = [m for m in sc.all_microphones(include_loopback=True) if m.isloopback]
+                    if loopbacks:
+                        mic = loopbacks[0]
 
-                    samples = data[:, 0]
-                    rms = float(np.sqrt(np.mean(samples ** 2)))
+                if not mic:
+                    self.msleep(300)
+                    continue
 
-                    if rms < 0.01:
-                        self.audio_data_signal.emit(0.0, 45.0, False)
-                        continue
+                with mic.recorder(samplerate=44100, blocksize=2048) as recorder:
+                    while self.running:
+                        data = recorder.record(numframes=2048)
+                        if not self.running:
+                            break
 
-                    fft_vals = np.abs(np.fft.rfft(samples))
-                    bass = float(np.sum(fft_vals[1:15]))
+                        samples = data[:, 0] if data.ndim > 1 else data
+                        rms = float(np.sqrt(np.mean(samples ** 2)))
 
-                    impulse = min(1.0, rms * 1.8 + bass * 0.004)
+                        if rms < 0.002:
+                            self.audio_data_signal.emit(0.0, 45.0, False)
+                            continue
 
-                    hue = 45.0
-                    self.audio_data_signal.emit(impulse, hue, True)
+                        fft_vals = np.abs(np.fft.rfft(samples))
+                        bass = float(np.sum(fft_vals[1:15]))
 
-        except ImportError:
-            print("[Visualizer Error]: Установите библиотеку soundcard: pip install soundcard")
-        except Exception as e:
-            print(f"[Visualizer Error]: {e}")
+                        raw = rms * 2.2 + bass * 0.0045
+                        self.peak_level = max(raw, self.peak_level * 0.985, 0.02)
+
+                        normalized = min(1.0, (raw / self.peak_level) ** 1.35)
+                        self.audio_data_signal.emit(normalized, 45.0, True)
+
+            except Exception:
+                self.msleep(300)
 
     def stop(self):
         self.running = False
-        self.wait()
+        if self.isRunning():
+            self.wait(200)
 
 
-class ArcMicButton(QPushButton):
+class AstraMicWidget(QFrame):
+    clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(260, 260)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setStyleSheet("background: transparent; border: none;")
+        self.setMouseTracking(True)
 
         self.pulse = 0.0
         self.boost = 0.0
@@ -90,31 +113,102 @@ class ArcMicButton(QPushButton):
         self.target_impulse = 0.0
         self.music_hue = 45.0
 
+        self.intro_progress = 0.0
         self.particles = []
-        for _ in range(700):
-            r_dist = random.gauss(72, 14)
-            if r_dist < 36:
-                r_dist = 36 + random.uniform(0, 8)
-            self.particles.append({
-                'r': r_dist,
-                'angle': random.uniform(0, math.pi * 2),
-                'speed': random.uniform(0.002, 0.008) * (1 if random.random() > 0.2 else -0.6),
-                'size': random.uniform(0.6, 2.0),
-                'color': "#ffffff",
-                'alpha': random.randint(120, 255)
-            })
+        self.total_particles = 600
 
-        self.setMouseTracking(True)
+        self.current_r = 255.0
+        self.current_g = 255.0
+        self.current_b = 255.0
+
+        self.target_r = 255.0
+        self.target_g = 255.0
+        self.target_b = 255.0
+
+        self.emotion_palette = {
+            "angry": (235.0, 40.0, 70.0),
+            "happy": (255.0, 215.0, 60.0),
+            "sad": (70.0, 205.0, 230.0),
+            "neutral": (255.0, 255.0, 255.0),
+            "other": (255.0, 255.0, 255.0)
+        }
+
+        self.reset_emotion_timer = QTimer(self)
+        self.reset_emotion_timer.setSingleShot(True)
+        self.reset_emotion_timer.timeout.connect(self._reset_to_neutral)
+
+        self._init_particles()
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate)
         self.timer.start(16)
+
+    def _init_particles(self):
+        self.particles.clear()
+        for i in range(self.total_particles):
+            r_dist = random.gauss(72, 14)
+            if r_dist < 36:
+                r_dist = 36 + random.uniform(0, 8)
+
+            angle = random.uniform(0, math.pi * 2)
+            speed = random.uniform(0.0015, 0.005) * (1 if random.random() > 0.2 else -0.6)
+
+            x_start = -random.uniform(40, 160)
+            y_start_off = random.gauss(0, 45)
+
+            p1_x_off = -random.uniform(40, 100)
+            p1_y_off = -random.uniform(30, 80)
+            p2_x_off = random.uniform(30, 70)
+            p2_y_off = random.uniform(20, 50)
+
+            delay = (i / self.total_particles) * 0.55 + random.uniform(0, 0.04)
+
+            self.particles.append({
+                'r': r_dist,
+                'accum_angle': angle,
+                'speed': speed,
+                'x_start': x_start,
+                'y_start_off': y_start_off,
+                'p1_x_off': p1_x_off,
+                'p1_y_off': p1_y_off,
+                'p2_x_off': p2_x_off,
+                'p2_y_off': p2_y_off,
+                'delay': delay,
+                'size': random.uniform(0.6, 2.0),
+                'alpha': random.randint(130, 255)
+            })
+
+    def start_intro_animation(self, duration=3800):
+        self.intro_anim = QVariantAnimation(self)
+        self.intro_anim.setDuration(duration)
+        self.intro_anim.setStartValue(0.0)
+        self.intro_anim.setEndValue(1.0)
+        self.intro_anim.setEasingCurve(QEasingCurve.Type.InOutSine)
+
+        def _on_val(v):
+            self.intro_progress = float(v)
+            self.update()
+
+        self.intro_anim.valueChanged.connect(_on_val)
+        self.intro_anim.start()
 
     def set_listening(self, state: bool):
         self.is_listening = state
 
     def set_speaking(self, state: bool):
         self.is_speaking = state
+
+    def set_emotion(self, emotion: str):
+        target = self.emotion_palette.get(emotion, (255.0, 255.0, 255.0))
+        self.target_r, self.target_g, self.target_b = target
+        self.reset_emotion_timer.stop()
+        if emotion != "neutral":
+            self.reset_emotion_timer.start(10000)
+
+    def _reset_to_neutral(self):
+        self.target_r = 255.0
+        self.target_g = 255.0
+        self.target_b = 255.0
 
     def on_audio_data(self, impulse: float, hue: float, is_music: bool):
         if self.is_speaking:
@@ -125,77 +219,151 @@ class ArcMicButton(QPushButton):
             if impulse > self.target_impulse:
                 self.target_impulse = impulse
             self.music_hue = hue
+        else:
+            self.target_impulse = 0.0
 
     def animate(self):
         self.pulse += 0.015
-
         self.beat_impulse += (self.target_impulse - self.beat_impulse) * 0.08
         self.target_impulse *= 0.93
+
+        self.current_r += (self.target_r - self.current_r) * 0.06
+        self.current_g += (self.target_g - self.current_g) * 0.06
+        self.current_b += (self.target_b - self.current_b) * 0.06
 
         if self.is_listening:
             target_boost = 2.0
         elif self.is_speaking:
-            target_boost = 1.2 + math.sin(self.pulse * 6.0) * 0.8
+            target_boost = 1.3 + math.sin(self.pulse * 4.0) * 0.6
         else:
             target_boost = 0.0
 
-        self.boost += (target_boost - self.boost) * 0.02
-
-        effective_boost = max(self.boost, self.beat_impulse * 3.0)
+        self.boost += (target_boost - self.boost) * 0.05
+        effective_boost = max(self.boost, self.beat_impulse * 2.8)
 
         for p in self.particles:
-            p['angle'] = (p['angle'] + p['speed'] * (1.0 + effective_boost)) % (math.pi * 2)
+            p['accum_angle'] = (p['accum_angle'] + p['speed'] * (1.0 + effective_boost)) % (math.pi * 2)
 
         self.update()
 
+    def _get_bezier_pt(self, p0, p1, p2, p3, t):
+        u = 1.0 - t
+        tt = t * t
+        uu = u * u
+        return (
+            uu * u * p0[0] + 3 * uu * t * p1[0] + 3 * u * tt * p2[0] + tt * t * p3[0],
+            uu * u * p0[1] + 3 * uu * t * p1[1] + 3 * u * tt * p2[1] + tt * t * p3[1]
+        )
+
     def paintEvent(self, event):
+        T = self.intro_progress
+        if T <= 0.001:
+            return
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        cx, cy = 130, 130
-        p_val = math.sin(self.pulse) * (2.5 if self.is_speaking else 1.2)
+        cx = self.width() / 2
+        cy = self.height() / 2
 
+        p_val = math.sin(self.pulse * (2.5 if self.is_speaking else 1.0)) * (2.2 if self.is_speaking else 1.2)
         active_impulse = self.beat_impulse
 
-        void_radius = 42 + (active_impulse * 20.0)
+        void_T = max(0.0, (T - 0.35) / 0.65)
+        eased_void = void_T * void_T * (3.0 - 2.0 * void_T)
 
-        void_shadow = QRadialGradient(cx, cy, void_radius)
-        void_shadow.setColorAt(0.0, QColor(0, 0, 0, 255))
-        void_shadow.setColorAt(0.85, QColor(0, 0, 0, 255))
-        void_shadow.setColorAt(1.0, QColor(0, 0, 0, 0))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(void_shadow))
-        painter.drawEllipse(QRectF(cx - void_radius, cy - void_radius, void_radius * 2, void_radius * 2))
+        speak_void = (abs(math.sin(self.pulse * 3.5)) * 9.0) if self.is_speaking else 0.0
+        void_radius = (42 + (active_impulse * 20.0) + speak_void) * eased_void
+
+        if void_radius > 1.0:
+            void_shadow = QRadialGradient(cx, cy, void_radius)
+            void_shadow.setColorAt(0.0, QColor(0, 0, 0, int(255 * eased_void)))
+            void_shadow.setColorAt(0.85, QColor(0, 0, 0, int(255 * eased_void)))
+            void_shadow.setColorAt(1.0, QColor(0, 0, 0, 0))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(void_shadow))
+            painter.drawEllipse(QRectF(cx - void_radius, cy - void_radius, void_radius * 2, void_radius * 2))
+
+        cur_r = int(self.current_r)
+        cur_g = int(self.current_g)
+        cur_b = int(self.current_b)
 
         for p in self.particles:
-            rad = p['r'] + (p_val * (1 if p['size'] > 1.2 else -1)) + (active_impulse * 25.0)
-            px = cx + math.cos(p['angle']) * rad
-            py = cy + math.sin(p['angle']) * rad
+            if T < p['delay']:
+                continue
+
+            local_t = min(1.0, (T - p['delay']) / (1.0 - p['delay']))
+            u = math.sin(local_t * (math.pi / 2))
+
+            cur_angle = p['accum_angle']
+            target_rad = p['r'] + (p_val * (1 if p['size'] > 1.2 else -1)) + (active_impulse * 24.0)
+            target_x = cx + math.cos(cur_angle) * target_rad
+            target_y = cy + math.sin(cur_angle) * target_rad
+
+            if u < 1.0:
+                p0 = (p['x_start'], cy + p['y_start_off'])
+                p1 = (cx + p['p1_x_off'], cy + p['p1_y_off'])
+                p2 = (cx + p['p2_x_off'], cy + p['p2_y_off'])
+                p3 = (target_x, target_y)
+                px, py = self._get_bezier_pt(p0, p1, p2, p3, u)
+            else:
+                px, py = target_x, target_y
 
             if active_impulse > 0.01 and not self.is_speaking:
-                p_hue = 42 + int(math.sin(p['angle'] * 5) * 6)
+                p_hue = 42 + int(math.sin(cur_angle * 5) * 6)
                 col = QColor.fromHsv(p_hue, 120, 220)
             else:
-                col = QColor(p['color'])
+                col = QColor(cur_r, cur_g, cur_b)
 
-            col.setAlpha(int(p['alpha'] * (0.85 if self.boost < 0.6 and active_impulse < 0.01 else 1.0)))
+            base_alpha = p['alpha'] * (0.85 if self.boost < 0.6 and active_impulse < 0.01 else 1.0)
+            alpha = int(base_alpha * min(1.0, local_t * 1.8))
+            col.setAlpha(alpha)
 
+            painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QBrush(col))
-
-            sz = p['size'] + (active_impulse * 2.0)
+            sz = p['size'] + (active_impulse * 1.8)
             painter.drawEllipse(QRectF(px - sz / 2, py - sz / 2, sz, sz))
+
+    def mouseMoveEvent(self, event):
+        if self.intro_progress < 0.95:
+            self.unsetCursor()
+            super().mouseMoveEvent(event)
+            return
+
+        cx, cy = self.width() / 2, self.height() / 2
+        dist = math.hypot(event.pos().x() - cx, event.pos().y() - cy)
+        if dist <= 95:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.unsetCursor()
+        super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event):
+        if self.intro_progress < 0.95:
+            super().mousePressEvent(event)
+            return
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            cx, cy = self.width() / 2, self.height() / 2
+            dist = math.hypot(event.pos().x() - cx, event.pos().y() - cy)
+            if dist <= 95:
+                self.clicked.emit()
+                event.accept()
+                return
+        super().mousePressEvent(event)
 
 
 class ChatFrame(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.border_phase = 0.0
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate_border)
         self.timer.start(20)
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(12, 12, 12, 12)
 
         self.chat_history = QTextEdit()
         self.chat_history.setObjectName("ChatHistory")
@@ -210,6 +378,7 @@ class ChatFrame(QFrame):
 
         self.send_button = QPushButton("Отправить")
         self.send_button.setObjectName("SendButton")
+        self.send_button.setCursor(Qt.CursorShape.PointingHandCursor)
         input_layout.addWidget(self.send_button)
 
         layout.addLayout(input_layout)
@@ -220,13 +389,18 @@ class ChatFrame(QFrame):
         self.update()
 
     def paintEvent(self, event):
-        super().paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         w, h = self.width(), self.height()
         if w < 15 or h < 15:
             return
+
+        rect = QRectF(0.75, 0.75, w - 1.5, h - 1.5)
+        path = QPainterPath()
+        path.addRoundedRect(rect, 12, 12)
+
+        painter.fillPath(path, QColor(8, 8, 5, 240))
 
         cx, cy = w / 2, h / 2
         dx = math.cos(self.border_phase) * w
@@ -242,12 +416,13 @@ class ChatFrame(QFrame):
         pen_border = QPen(QBrush(border_grad), 1.5)
         painter.setPen(pen_border)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(QRectF(0.75, 0.75, w - 1.5, h - 1.5), 12, 12)
+        painter.drawPath(path)
 
 
 class BackgroundFrame(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.wave_phase = 0.0
 
         self.stars = []
@@ -262,7 +437,7 @@ class BackgroundFrame(QFrame):
 
         self.dust_cloud = []
         gold_spectrum = ["#ffffff", "#fffde7", "#fff59d", "#ffee55", "#ffd700", "#e5c158", "#c4a028", "#997a1e"]
-        for _ in range(1400):
+        for _ in range(1100):
             curve = random.choice([0, 0, 0, 1, 1, 2])
             spread = random.gauss(0, 12) if random.random() < 0.7 else random.gauss(0, 26)
             self.dust_cloud.append({
@@ -307,9 +482,9 @@ class BackgroundFrame(QFrame):
 
         clip_path = QPainterPath()
         clip_path.addRoundedRect(QRectF(0, 0, w, h), 16, 16)
-        painter.setClipPath(clip_path)
 
-        painter.fillRect(self.rect(), QColor("#000000"))
+        painter.fillPath(clip_path, QColor("#000000"))
+        painter.setClipPath(clip_path)
 
         for star in self.stars:
             sx = star['rx'] * w
@@ -357,14 +532,12 @@ class BackgroundFrame(QFrame):
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(QRectF(0.75, 0.75, w - 1.5, h - 1.5), 16, 16)
 
-        super().paintEvent(event)
-
 
 class VolumeDucker:
     def __init__(self):
         self.saved_volumes = {}
 
-    def duck(self):
+    def _duck_async(self):
         try:
             CoInitialize()
             self.saved_volumes.clear()
@@ -374,7 +547,6 @@ class VolumeDucker:
                 process = session.Process
                 if process:
                     name = process.name().lower()
-
                     if "python" in name or "pycharm" in name:
                         continue
 
@@ -385,8 +557,19 @@ class VolumeDucker:
                     volume.SetMasterVolume(current_vol * 0.10, None)
         except Exception as e:
             print(f"[Volume Ducker Error]: {e}")
+        finally:
+            try:
+                CoUninitialize()
+            except Exception:
+                pass
 
-    def restore(self):
+    def duck(self):
+        threading.Thread(target=self._duck_async, daemon=True).start()
+
+    def _restore_async(self):
+        if not self.saved_volumes:
+            return
+
         try:
             CoInitialize()
             sessions = AudioUtilities.GetAllSessions()
@@ -394,14 +577,24 @@ class VolumeDucker:
             for session in sessions:
                 process = session.Process
                 if process and process.pid in self.saved_volumes:
-                    volume = session._ctl.QueryInterface(ISimpleAudioVolume)
-
-                    saved_vol = self.saved_volumes[process.pid]
-                    volume.SetMasterVolume(saved_vol, None)
+                    try:
+                        volume = session._ctl.QueryInterface(ISimpleAudioVolume)
+                        saved_vol = self.saved_volumes[process.pid]
+                        volume.SetMasterVolume(saved_vol, None)
+                    except Exception:
+                        pass
 
             self.saved_volumes.clear()
         except Exception as e:
             print(f"[Volume Ducker Error]: {e}")
+        finally:
+            try:
+                CoUninitialize()
+            except Exception:
+                pass
+
+    def restore(self):
+        threading.Thread(target=self._restore_async, daemon=True).start()
 
 
 class MainWindow(QWidget):
@@ -412,16 +605,30 @@ class MainWindow(QWidget):
         self.ui_revealed = False
         self.command_parser = CommandParser()
 
+        self.vision_thread = None
+        self.presence_manager = None
+
         self.init_ui()
         self.init_audio()
-        QTimer.singleShot(2000, self.init_vision)
+
+        cfg_modules = self.config.get("modules", {}) if isinstance(self.config, dict) else {}
+        if cfg_modules.get("vision", False):
+            QTimer.singleShot(6500, self.start_vision)
+
+        atexit.register(self.ducker.restore)
 
     def init_ui(self):
-        font_path = os.path.join("assets", "fonts", "Schiffbauer-Regular.otf")
+        base_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
+        font_path = os.path.join(base_dir, "assets", "fonts", "Schiffbauer-Regular.otf")
+
+        if not os.path.exists(font_path):
+            font_path = os.path.join("assets", "fonts", "Schiffbauer-Regular.otf")
+
         font_id = QFontDatabase.addApplicationFont(font_path)
 
         if font_id != -1:
-            self.font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
+            families = QFontDatabase.applicationFontFamilies(font_id)
+            self.font_family = families[0] if families else "Arial"
             self.custom_font = QFont(self.font_family, 11)
         else:
             print("[UI Warning]: Не удалось загрузить шрифт. Используем системный.")
@@ -482,7 +689,7 @@ class MainWindow(QWidget):
         close_btn = QPushButton("✕")
         close_btn.setObjectName("CloseBtn")
         close_btn.setFixedWidth(30)
-        close_btn.clicked.connect(self.hide)
+        close_btn.clicked.connect(self.close)
         title_bar.addWidget(close_btn)
 
         right_area_layout.addLayout(title_bar)
@@ -491,28 +698,17 @@ class MainWindow(QWidget):
         self.content_layout.setContentsMargins(6, 6, 6, 6)
         self.content_layout.setSpacing(0)
 
-        self.left_panel = QFrame()
-        self.left_panel.setObjectName("LeftPanel")
-        left_layout = QVBoxLayout()
-        left_layout.setContentsMargins(4, 0, 0, 4)
-
-        self.mic_btn = ArcMicButton()
-
-        mic_container = QHBoxLayout()
-        mic_container.addStretch()
-        mic_container.addWidget(self.mic_btn)
-        mic_container.addStretch()
+        self.left_panel = AstraMicWidget(self)
+        left_layout = QVBoxLayout(self.left_panel)
+        left_layout.setContentsMargins(15, 0, 0, 12)
 
         left_layout.addStretch()
-        left_layout.addLayout(mic_container)
-        left_layout.addStretch()
 
-        author_label = QLabel("Created by Svetozar")
-        author_label.setStyleSheet(
-            f"font-family: '{self.font_family}'; color: rgba(255, 255, 255, 0.35); font-size: 13px; font-weight: 500;")
-        left_layout.addWidget(author_label, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+        self.author_label = QLabel("Created by Svetozar")
+        self.author_label.setStyleSheet(
+            f"font-family: '{self.font_family}'; color: rgba(255, 255, 255, 0.0); font-size: 13px; font-weight: 500;")
+        left_layout.addWidget(self.author_label, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
 
-        self.left_panel.setLayout(left_layout)
         self.content_layout.addWidget(self.left_panel)
 
         right_area_layout.addLayout(self.content_layout)
@@ -525,6 +721,7 @@ class MainWindow(QWidget):
         self.settings_panel.setMaximumWidth(0)
         self.settings_panel.hide()
         self.settings_panel.speak_requested.connect(self.speak_reply)
+        self.settings_panel.vision_state_changed.connect(self.on_vision_state_changed)
         container_layout.addWidget(self.settings_panel)
 
         self.right_panel = ChatFrame()
@@ -548,43 +745,29 @@ class MainWindow(QWidget):
         main_layout.addWidget(container)
         self.setLayout(main_layout)
 
-        self.main_ui_opacity = QGraphicsOpacityEffect(self.left_panel)
-        self.left_panel.setGraphicsEffect(self.main_ui_opacity)
-        self.main_ui_opacity.setOpacity(0.0)
-
-        self.title_btns_opacity = QGraphicsOpacityEffect(self.title_btns_widget)
-        self.title_btns_widget.setGraphicsEffect(self.title_btns_opacity)
-        self.title_btns_opacity.setOpacity(0.0)
-
-        self.chat_opacity = QGraphicsOpacityEffect(self.right_panel)
-        self.right_panel.setGraphicsEffect(self.chat_opacity)
-        self.chat_opacity.setOpacity(0.0)
-
-        self.settings_opacity = QGraphicsOpacityEffect(self.settings_panel)
-        self.settings_panel.setGraphicsEffect(self.settings_opacity)
-        self.settings_opacity.setOpacity(0.0)
-
+        self.title_btns_widget.hide()
         self.set_ui_interactive(False)
 
-        self.anim_group = QParallelAnimationGroup(self)
+        self.settings_anim_group = QParallelAnimationGroup(self)
+        self.chat_anim_group = QParallelAnimationGroup(self)
 
     def set_ui_interactive(self, enabled: bool):
         self.settings_btn.setEnabled(enabled)
         self.toggle_chat_btn.setEnabled(enabled)
-        self.mic_btn.setEnabled(enabled)
 
     def init_audio(self):
-        self.stt_thread = STTThread(model_path="models/model_vosk", parent=self)
+        self.stt_thread = STTThread(model_path="optimized_models/model_vosk", parent=self)
         self.stt_thread.text_recognized.connect(self.on_speech_recognized)
-        self.stt_thread.listening_state_changed.connect(self.mic_btn.set_listening)
+        self.stt_thread.listening_state_changed.connect(self.left_panel.set_listening)
         self.stt_thread.error_occurred.connect(self.on_stt_error)
         self.stt_thread.start()
 
         self.tts_thread = TTSThread(parent=self)
+        self.tts_thread.warmup_finished.connect(self.on_warmup_completed)
+
         self.ducker = VolumeDucker()
-        self.tts_thread.speaking_started.connect(self.on_initial_speech_started)
-        self.tts_thread.speaking_started.connect(lambda: self.mic_btn.set_speaking(True))
-        self.tts_thread.speaking_finished.connect(lambda: self.mic_btn.set_speaking(False))
+        self.tts_thread.speaking_started.connect(lambda: self.left_panel.set_speaking(True))
+        self.tts_thread.speaking_finished.connect(lambda: self.left_panel.set_speaking(False))
 
         self.tts_thread.speaking_started.connect(lambda: self.stt_thread.set_speaking(True))
         self.tts_thread.speaking_finished.connect(lambda: self.stt_thread.set_speaking(False))
@@ -592,21 +775,53 @@ class MainWindow(QWidget):
         self.tts_thread.speaking_started.connect(self.ducker.duck)
         self.tts_thread.speaking_finished.connect(self.ducker.restore)
 
-        self.mic_btn.clicked.connect(self.stt_thread.trigger_manual_listen)
+        self.left_panel.clicked.connect(self.stt_thread.trigger_manual_listen)
 
         self.audio_worker = AudioVisualizerWorker(parent=self)
-        self.audio_worker.audio_data_signal.connect(self.mic_btn.on_audio_data)
+        self.audio_worker.audio_data_signal.connect(self.left_panel.on_audio_data)
         self.audio_worker.start()
 
         user_name = "друг"
         if isinstance(self.config, dict):
             user_name = self.config.get("user_name", "друг")
+        self.initial_greeting_text = f"Привет, {user_name}!"
 
-        self.tts_thread.start_with_greeting(f"Привет, {user_name}!")
+        self.tts_thread.start_warmup(greeting_text=self.initial_greeting_text)
 
-    def init_vision(self):
+    def on_warmup_completed(self):
+        self.reveal_ui()
+        QTimer.singleShot(1500, self.play_initial_greeting)
+
+    def reveal_ui(self):
+        if not self.ui_revealed:
+            self.ui_revealed = True
+            self.set_ui_interactive(True)
+            self.title_btns_widget.show()
+
+            self.left_panel.start_intro_animation(duration=3800)
+
+            self.author_anim = QVariantAnimation(self)
+            self.author_anim.setDuration(2400)
+            self.author_anim.setStartValue(0.0)
+            self.author_anim.setEndValue(0.35)
+
+            def _update_author_opacity(alpha):
+                self.author_label.setStyleSheet(
+                    f"font-family: '{self.font_family}'; color: rgba(255, 255, 255, {alpha:.2f}); font-size: 13px; font-weight: 500;"
+                )
+
+            self.author_anim.valueChanged.connect(_update_author_opacity)
+            self.author_anim.start()
+
+    def play_initial_greeting(self):
+        self.tts_thread.play_cached_greeting()
+
+    def start_vision(self):
+        if self.vision_thread is not None and self.vision_thread.isRunning():
+            return
+
         self.vision_thread = VisionThread(camera_index=0, parent=self)
-        self.presence_manager = PresenceManager(timeout_seconds=300, parent=self)
+        self.presence_manager = PresenceManager(timeout_seconds=600, parent=self)
 
         self.vision_thread.face_detected_signal.connect(self.presence_manager.process_face_status)
         self.vision_thread.gesture_detected_signal.connect(self.on_gesture_detected)
@@ -621,8 +836,26 @@ class MainWindow(QWidget):
 
         self.vision_thread.start()
 
+    def stop_vision(self):
+        if self.presence_manager is not None:
+            if hasattr(self.presence_manager, 'timer') and self.presence_manager.timer.isActive():
+                self.presence_manager.timer.stop()
+            self.presence_manager = None
+
+        if self.vision_thread is not None:
+            self.vision_thread.stop()
+            self.vision_thread = None
+
+    def on_vision_state_changed(self, enabled: bool):
+        if enabled:
+            QTimer.singleShot(3800, self.start_vision)
+        else:
+            QTimer.singleShot(2000, self.stop_vision)
+
     def on_unknown_user(self):
-        cfg = SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
+        cfg = self.config if isinstance(self.config, dict) else (
+            SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
+        )
         if not cfg.get("modules", {}).get("vision", True):
             return
 
@@ -630,7 +863,9 @@ class MainWindow(QWidget):
         SystemActions.lock_screen()
 
     def on_gesture_detected(self, gesture_name):
-        cfg = SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
+        cfg = self.config if isinstance(self.config, dict) else (
+            SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
+        )
         if not cfg.get("modules", {}).get("gestures", True):
             return
 
@@ -641,93 +876,89 @@ class MainWindow(QWidget):
         elif gesture_name == "pointing":
             SystemActions.media_next_track()
 
-    def on_initial_speech_started(self):
-        if not self.ui_revealed:
-            self.ui_revealed = True
-
-            self.set_ui_interactive(True)
-
-            self.reveal_anim_ui = QPropertyAnimation(self.main_ui_opacity, b"opacity")
-            self.reveal_anim_ui.setDuration(1200)
-            self.reveal_anim_ui.setStartValue(0.0)
-            self.reveal_anim_ui.setEndValue(1.0)
-            self.reveal_anim_ui.setEasingCurve(QEasingCurve.Type.InOutCubic)
-
-            self.reveal_anim_btns = QPropertyAnimation(self.title_btns_opacity, b"opacity")
-            self.reveal_anim_btns.setDuration(1200)
-            self.reveal_anim_btns.setStartValue(0.0)
-            self.reveal_anim_btns.setEndValue(1.0)
-            self.reveal_anim_btns.setEasingCurve(QEasingCurve.Type.InOutCubic)
-
-            self.reveal_group = QParallelAnimationGroup(self)
-            self.reveal_group.addAnimation(self.reveal_anim_ui)
-            self.reveal_group.addAnimation(self.reveal_anim_btns)
-            self.reveal_group.start()
-
     def speak_reply(self, text):
         if text:
             self.tts_thread.say(text)
 
-    def on_speech_recognized(self, text):
+    def on_speech_recognized(self, text, audio_data=None):
         if not self.ui_revealed:
             return
 
-        response = self.command_parser.process_command(text)
+        response = self.command_parser.process_command(text, audio_data=audio_data, is_voice=True)
         if response:
-            self.speak_reply(response)
+            if isinstance(response, dict):
+                chat_text = response.get("chat", "")
+                voice_text = response.get("voice", "")
+                emotion = response.get("emotion", "neutral")
+            else:
+                chat_text = voice_text = str(response)
+                emotion = getattr(self.command_parser, "last_emotion", "neutral")
+
+            self.left_panel.set_emotion(emotion)
+
+            if chat_text:
+                self.chat_history.append(f"Вы (голос): {text}")
+                self.chat_history.append(f"Астра: {chat_text}\n")
+
+                if isinstance(response, dict) and "Список доступных вариантов обхода" in chat_text:
+                    if not (self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0):
+                        self.toggle_chat()
+
+            if voice_text:
+                self.speak_reply(voice_text)
+        else:
+            emotion = getattr(self.command_parser, "last_emotion", "neutral")
+            self.left_panel.set_emotion(emotion)
 
     def on_stt_error(self, err):
         pass
 
     def closeEvent(self, event):
-        if hasattr(self, 'vision_thread'):
-            self.vision_thread.stop()
-        if hasattr(self, 'audio_worker'):
+        event.ignore()
+        self.hide()
+
+    def shutdown(self):
+        if hasattr(self, 'ducker'):
+            self.ducker.restore()
+        if hasattr(self, 'audio_worker') and self.audio_worker.isRunning():
             self.audio_worker.stop()
-        if hasattr(self, 'stt_thread'):
+        if hasattr(self, 'tts_thread') and self.tts_thread.isRunning():
+            self.tts_thread.stop()
+        self.stop_vision()
+        if hasattr(self, 'stt_thread') and self.stt_thread.isRunning():
             self.stt_thread.stop_thread()
-        super().closeEvent(event)
 
     def toggle_settings(self):
-        self.anim_group.stop()
-        self.anim_group.clear()
+        self.settings_anim_group.stop()
+        self.settings_anim_group.clear()
 
-        def on_anim_finished():
+        is_opening = not (self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0)
+
+        if is_opening and self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0:
+            self.toggle_chat()
+
+        def on_settings_finished():
             if self.settings_panel.maximumWidth() == 0:
                 self.settings_panel.hide()
-            try:
-                self.anim_group.finished.disconnect(on_anim_finished)
-            except TypeError:
-                pass
 
-        self.anim_group.finished.connect(on_anim_finished)
+        try:
+            self.settings_anim_group.finished.disconnect()
+        except TypeError:
+            pass
+
+        self.settings_anim_group.finished.connect(on_settings_finished)
 
         anim_settings_min = QPropertyAnimation(self.settings_panel, b"minimumWidth")
-        anim_settings_min.setDuration(850)
+        anim_settings_min.setDuration(600)
         anim_settings_min.setEasingCurve(QEasingCurve.Type.InOutQuart)
 
         anim_settings_max = QPropertyAnimation(self.settings_panel, b"maximumWidth")
-        anim_settings_max.setDuration(850)
+        anim_settings_max.setDuration(600)
         anim_settings_max.setEasingCurve(QEasingCurve.Type.InOutQuart)
 
-        anim_settings_op = QPropertyAnimation(self.settings_opacity, b"opacity")
-        anim_settings_op.setDuration(850)
-        anim_settings_op.setEasingCurve(QEasingCurve.Type.InOutQuart)
+        cur_w = self.settings_panel.width() if self.settings_panel.isVisible() else 0
 
-        if self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0:
-            cur_w = self.settings_panel.width()
-            anim_settings_min.setStartValue(cur_w)
-            anim_settings_min.setEndValue(0)
-            anim_settings_max.setStartValue(cur_w)
-            anim_settings_max.setEndValue(0)
-            anim_settings_op.setStartValue(self.settings_opacity.opacity())
-            anim_settings_op.setEndValue(0.0)
-        else:
-            if self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0:
-                self.toggle_chat()
-
-            cur_w = self.settings_panel.width() if (
-                    self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0) else 0
+        if is_opening:
             self.settings_panel.setMinimumWidth(cur_w)
             self.settings_panel.setMaximumWidth(cur_w)
             self.settings_panel.show()
@@ -736,54 +967,47 @@ class MainWindow(QWidget):
             anim_settings_min.setEndValue(375)
             anim_settings_max.setStartValue(cur_w)
             anim_settings_max.setEndValue(375)
-            anim_settings_op.setStartValue(self.settings_opacity.opacity())
-            anim_settings_op.setEndValue(1.0)
+        else:
+            anim_settings_min.setStartValue(cur_w)
+            anim_settings_min.setEndValue(0)
+            anim_settings_max.setStartValue(cur_w)
+            anim_settings_max.setEndValue(0)
 
-        self.anim_group.addAnimation(anim_settings_min)
-        self.anim_group.addAnimation(anim_settings_max)
-        self.anim_group.addAnimation(anim_settings_op)
-        self.anim_group.start()
+        self.settings_anim_group.addAnimation(anim_settings_min)
+        self.settings_anim_group.addAnimation(anim_settings_max)
+        self.settings_anim_group.start()
 
     def toggle_chat(self):
-        self.anim_group.stop()
-        self.anim_group.clear()
+        self.chat_anim_group.stop()
+        self.chat_anim_group.clear()
 
-        def on_anim_finished():
+        is_opening = not (self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0)
+
+        if is_opening and self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0:
+            self.toggle_settings()
+
+        def on_chat_finished():
             if self.right_panel.maximumWidth() == 0:
                 self.right_panel.hide()
-            try:
-                self.anim_group.finished.disconnect(on_anim_finished)
-            except TypeError:
-                pass
 
-        self.anim_group.finished.connect(on_anim_finished)
+        try:
+            self.chat_anim_group.finished.disconnect()
+        except TypeError:
+            pass
+
+        self.chat_anim_group.finished.connect(on_chat_finished)
 
         anim_chat_min = QPropertyAnimation(self.right_panel, b"minimumWidth")
-        anim_chat_min.setDuration(850)
+        anim_chat_min.setDuration(600)
         anim_chat_min.setEasingCurve(QEasingCurve.Type.InOutQuart)
 
         anim_chat_max = QPropertyAnimation(self.right_panel, b"maximumWidth")
-        anim_chat_max.setDuration(850)
+        anim_chat_max.setDuration(600)
         anim_chat_max.setEasingCurve(QEasingCurve.Type.InOutQuart)
 
-        anim_chat_op = QPropertyAnimation(self.chat_opacity, b"opacity")
-        anim_chat_op.setDuration(850)
-        anim_chat_op.setEasingCurve(QEasingCurve.Type.InOutQuart)
+        cur_w = self.right_panel.width() if self.right_panel.isVisible() else 0
 
-        if self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0:
-            cur_w = self.right_panel.width()
-            anim_chat_min.setStartValue(cur_w)
-            anim_chat_min.setEndValue(0)
-            anim_chat_max.setStartValue(cur_w)
-            anim_chat_max.setEndValue(0)
-            anim_chat_op.setStartValue(self.chat_opacity.opacity())
-            anim_chat_op.setEndValue(0.0)
-        else:
-            if self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0:
-                self.toggle_settings()
-
-            cur_w = self.right_panel.width() if (
-                    self.right_panel.isVisible() and self.right_panel.maximumWidth() > 0) else 0
+        if is_opening:
             self.right_panel.setMinimumWidth(cur_w)
             self.right_panel.setMaximumWidth(cur_w)
             self.right_panel.show()
@@ -792,13 +1016,15 @@ class MainWindow(QWidget):
             anim_chat_min.setEndValue(375)
             anim_chat_max.setStartValue(cur_w)
             anim_chat_max.setEndValue(375)
-            anim_chat_op.setStartValue(self.chat_opacity.opacity())
-            anim_chat_op.setEndValue(1.0)
+        else:
+            anim_chat_min.setStartValue(cur_w)
+            anim_chat_min.setEndValue(0)
+            anim_chat_max.setStartValue(cur_w)
+            anim_chat_max.setEndValue(0)
 
-        self.anim_group.addAnimation(anim_chat_min)
-        self.anim_group.addAnimation(anim_chat_max)
-        self.anim_group.addAnimation(anim_chat_op)
-        self.anim_group.start()
+        self.chat_anim_group.addAnimation(anim_chat_min)
+        self.chat_anim_group.addAnimation(anim_chat_max)
+        self.chat_anim_group.start()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -810,14 +1036,27 @@ class MainWindow(QWidget):
             self.move(event.globalPosition().toPoint() - self.drag_position)
             event.accept()
 
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drag_position = QPoint()
+            event.accept()
+
     def send_message(self):
         if not self.ui_revealed:
             return
         text = self.input_field.text().strip()
         if text:
             self.chat_history.append(f"Вы: {text}")
-            response = self.command_parser.process_command(text)
+            response = self.command_parser.process_command(text, is_voice=False)
             if response:
-                self.chat_history.append(f"Астра: {response}\n")
-                self.speak_reply(response)
+                if isinstance(response, dict):
+                    chat_text = response.get("chat", "") or response.get("voice", "")
+                    voice_text = response.get("voice", "")
+                else:
+                    chat_text = voice_text = str(response)
+
+                if chat_text:
+                    self.chat_history.append(f"Астра: {chat_text}\n")
+                if voice_text:
+                    self.speak_reply(voice_text)
             self.input_field.clear()

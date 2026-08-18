@@ -25,7 +25,7 @@ class SpeechListener:
             "быстро", "автора", "пастра", "астрал", "австралия"
         }
 
-        model_path = os.path.join(base_dir, "models", "model_vosk")
+        model_path = os.path.join(base_dir, "optimized_models", "model_vosk")
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Модель Vosk не найдена по адресу: {model_path}")
 

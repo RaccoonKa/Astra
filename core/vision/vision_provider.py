@@ -19,6 +19,17 @@ class VisionThread(QThread):
         self.frame_counter = 0
         self.last_gesture = None
         self.gesture_cooldown = 0
+        self.face_cascade = None
+
+        try:
+            if hasattr(cv2, 'CascadeClassifier') and hasattr(cv2, 'data'):
+                cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                self.face_cascade = cv2.CascadeClassifier(cascade_path)
+                if self.face_cascade.empty():
+                    self.face_cascade = None
+        except Exception as e:
+            print(f"[VISION WARNING]: Не удалось загрузить каскад лиц: {e}")
+            self.face_cascade = None
 
     def _get_modules_config(self):
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -70,7 +81,21 @@ class VisionThread(QThread):
             self.frame_counter += 1
 
             if vision_enabled:
-                self.face_detected_signal.emit(True)
+                if self.frame_counter % 5 == 0:
+                    if self.face_cascade is not None:
+                        try:
+                            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                            faces = self.face_cascade.detectMultiScale(
+                                gray,
+                                scaleFactor=1.2,
+                                minNeighbors=5,
+                                minSize=(60, 60)
+                            )
+                            self.face_detected_signal.emit(len(faces) > 0)
+                        except Exception:
+                            self.face_detected_signal.emit(True)
+                    else:
+                        self.face_detected_signal.emit(True)
 
             if gestures_enabled:
                 if self.gesture_cooldown > 0:

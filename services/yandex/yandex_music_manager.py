@@ -7,6 +7,7 @@ import time
 import hashlib
 import xml.etree.ElementTree as ET
 import requests
+import webbrowser
 
 vlc_paths = [
     r"C:\Program Files\VideoLAN\VLC",
@@ -157,7 +158,8 @@ class YandexMusicManager:
 
     def play_query(self, query):
         if not HAS_VLC:
-            return "Установи VLC Player 64-bit для фонового проигрывания"
+            webbrowser.open("https://www.videolan.org/vlc/")
+            return "Для работы Яндекс Музыки нужен плеер. Открываю официальный сайт для скачивания."
 
         if not self._init_client():
             return "Укажи токен Яндекс Музыки в настройках"
@@ -186,7 +188,11 @@ class YandexMusicManager:
         return f"Ищу {query}"
 
     def play_my_wave(self):
-        if not HAS_VLC or not self._init_client():
+        if not HAS_VLC:
+            webbrowser.open("https://www.videolan.org/vlc/")
+            return "Для работы Яндекс Музыки нужен плеер. Открываю официальный сайт для скачивания."
+
+        if not self._init_client():
             return False
 
         self.is_transitioning = True

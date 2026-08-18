@@ -1,39 +1,12 @@
 import os
-os.environ["HF_HUB_OFFLINE"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
-
 import json
-import torch
-import torch.nn as nn
-from transformers import AutoTokenizer, BertModel, BertPreTrainedModel
-
-
-class JointRuBertNLU(BertPreTrainedModel):
-    def __init__(self, config, num_intents=1, num_slots=1):
-        super().__init__(config)
-        self.bert = BertModel(config)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.intent_classifier = nn.Linear(config.hidden_size, num_intents)
-        self.slot_classifier = nn.Linear(config.hidden_size, num_slots)
-        self.post_init()
-
-    def forward(self, input_ids, attention_mask=None):
-        outputs = self.bert(input_ids, attention_mask=attention_mask)
-        sequence_output = outputs[0]
-        pooled_output = outputs[1]
-
-        sequence_output = self.dropout(sequence_output)
-        pooled_output = self.dropout(pooled_output)
-
-        intent_logits = self.intent_classifier(pooled_output)
-        slot_logits = self.slot_classifier(sequence_output)
-
-        return intent_logits, slot_logits
+import numpy as np
+import onnxruntime as ort
+from transformers import AutoTokenizer
 
 
 class JointNLU:
-    def __init__(self, model_dir="models/joint_nlu"):
-        self.device = torch.device("cpu")
+    def __init__(self, model_dir="optimized_models/joint_nlu"):
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         full_model_dir = os.path.join(base_dir, model_dir)
 
@@ -44,34 +17,33 @@ class JointNLU:
             self.id2slot = {int(k): v for k, v in cfg["id2slot"].items()}
 
         self.tokenizer = AutoTokenizer.from_pretrained(full_model_dir, local_files_only=True)
-        self.model = JointRuBertNLU.from_pretrained(
-            full_model_dir,
-            num_intents=len(self.id2intent),
-            num_slots=len(self.id2slot),
-            local_files_only=True
-        ).to(self.device)
-        self.model.eval()
+
+        onnx_model_path = os.path.join(full_model_dir, "model_quant.onnx")
+        self.session = ort.InferenceSession(onnx_model_path, providers=["CPUExecutionProvider"])
 
     def predict(self, text):
         if not text:
             return None, 0.0, {}
 
         text_low = text.lower()
-        inputs = self.tokenizer(text_low, return_offsets_mapping=True, return_tensors="pt")
+        inputs = self.tokenizer(text_low, return_offsets_mapping=True, return_tensors="np")
         offset_mapping = inputs["offset_mapping"][0].tolist()
 
-        with torch.no_grad():
-            intent_logits, slot_logits = self.model(
-                input_ids=inputs["input_ids"].to(self.device),
-                attention_mask=inputs["attention_mask"].to(self.device)
-            )
+        ort_inputs = {
+            "input_ids": inputs["input_ids"].astype(np.int64),
+            "attention_mask": inputs["attention_mask"].astype(np.int64)
+        }
 
-            intent_probs = torch.softmax(intent_logits, dim=-1)
-            confidence, predicted_idx = torch.max(intent_probs, dim=-1)
-            intent_name = self.id2intent.get(predicted_idx.item(), None)
-            confidence_val = confidence.item()
+        intent_logits, slot_logits = self.session.run(None, ort_inputs)
 
-            slot_preds = torch.argmax(slot_logits, dim=-1)[0].cpu().numpy()
+        exp_logits = np.exp(intent_logits[0] - np.max(intent_logits[0]))
+        intent_probs = exp_logits / exp_logits.sum()
+
+        predicted_idx = int(np.argmax(intent_probs))
+        confidence_val = float(intent_probs[predicted_idx])
+        intent_name = self.id2intent.get(predicted_idx, None)
+
+        slot_preds = np.argmax(slot_logits[0], axis=-1)
 
         slots = {}
         current_entity = None
@@ -82,7 +54,7 @@ class JointNLU:
             if start == end:
                 continue
 
-            label = self.id2slot.get(pred, "O")
+            label = self.id2slot.get(int(pred), "O")
 
             if label.startswith("B-"):
                 if current_entity and current_start is not None and current_end is not None:

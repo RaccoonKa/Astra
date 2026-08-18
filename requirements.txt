@@ -16,6 +16,7 @@ torchvision==0.17.0
 torchaudio==2.2.0
 pandas==2.2.0
 scikit-learn==1.4.0
+matplotlib==3.11.1
 
 # Аудио и Речь (Vosk + Звук + TTS)
 vosk==0.3.45

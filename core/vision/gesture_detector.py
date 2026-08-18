@@ -12,8 +12,8 @@ from mediapipe.tasks.python import vision
 
 def get_hand_model_path():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_dir)))
-    models_dir = os.path.join(project_dir, "models")
+    project_dir = os.path.dirname(os.path.dirname(script_dir))
+    models_dir = os.path.join(project_dir, "optimized_models", "hand_landmaker")
     os.makedirs(models_dir, exist_ok=True)
 
     model_path = os.path.join(models_dir, "hand_landmarker.task")
@@ -51,15 +51,14 @@ class GestureDetector:
         self.detector = vision.HandLandmarker.create_from_options(options)
         self.clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
 
-    def _enhance_light(self, frame_bgr):
-        lab = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2LAB)
-        l_channel, a_channel, b_channel = cv2.split(lab)
-        cl = self.clahe.apply(l_channel)
-        limg = cv2.merge((cl, a_channel, b_channel))
-        return cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+    def _enhance_light(self, small_bgr):
+        lab = cv2.cvtColor(small_bgr, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        l = self.clahe.apply(l)
+        enhanced_lab = cv2.merge((l, a, b))
+        return cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
 
     def _dist(self, p1, p2):
-        """ Вычисление евклидова расстояния между суставами """
         return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2)
 
     def process_frame(self, frame_bgr):
@@ -80,7 +79,6 @@ class GestureDetector:
             lm = detection_result.hand_landmarks[0]
             wrist = lm[0]
 
-            # Оцениваем сжатость пальцев относительно запястья (относительные расстояния)
             index_folded = self._dist(lm[8], wrist) < self._dist(lm[6], wrist)
             middle_folded = self._dist(lm[12], wrist) < self._dist(lm[10], wrist)
             ring_folded = self._dist(lm[16], wrist) < self._dist(lm[14], wrist)

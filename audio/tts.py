@@ -6,42 +6,41 @@ import numpy as np
 from scipy.signal import butter, filtfilt
 from PyQt6.QtCore import QThread, pyqtSignal
 
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, "models", "v4_ru.pt")
+DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, "optimized_models", "silero_tts", "v4_ru.pt")
 
 
 class TTSThread(QThread):
     speaking_started = pyqtSignal()
     speaking_finished = pyqtSignal()
+    warmup_finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
     def __init__(self, model_path=None, parent=None):
         super().__init__(parent)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cpu')
         self.model = None
         self.model_path = model_path if model_path else DEFAULT_MODEL_PATH
         self.text_to_speak = ""
         self.speaker = 'kseniya'
         self.sample_rate = 48000
-        self.initial_greeting = ""
+        self._stopped = False
+        self._is_warmup = False
+        self._play_cached_flag = False
+        self.greeting_to_precache = ""
+        self.cached_greeting_audio = None
+        self.warmup_text = ("Астра, доброе утро! Все системы функционируют в штатном режиме. Проверка речевого тракта завершена, частота дискретизации стабильна. Слушаю вас внимательно. "
+                            "Астра, приветствую! Жду дальнейших указаний. Шестнадцать каналов связи прослушиваются, шифрование активно, динамики прогреты до рабочей температуры. Порядок.")
 
     def _init_model(self):
-        if self.model is None:
-            torch.set_num_threads(4)
-            importer = torch.package.PackageImporter(self.model_path)
-            self.model = importer.load_pickle("tts_models", "model")
-            self.model.to(self.device)
-
-            with torch.inference_mode():
-                try:
-                    self.model.apply_tts(
-                        text="Тестовая нормализация текста, цифр 123 и расстановка всех ударений.",
-                        speaker=self.speaker,
-                        sample_rate=self.sample_rate
-                    )
-                except Exception:
-                    pass
+        if self.model is None and os.path.exists(self.model_path):
+            try:
+                torch.set_num_threads(4)
+                importer = torch.package.PackageImporter(self.model_path)
+                self.model = importer.load_pickle("tts_models", "model")
+                self.model.to(self.device)
+            except Exception as e:
+                print(f"[TTS Init Error]: {e}")
 
     def _soften_audio(self, audio_np, cutoff=7000):
         nyquist = 0.5 * self.sample_rate
@@ -71,20 +70,89 @@ class TTSThread(QThread):
         cleaned = re.sub(r'[:;=]-?[()DOPpP|/\\]|<3', '', cleaned)
         return re.sub(r'\s+', ' ', cleaned).strip()
 
-    def start_with_greeting(self, greeting_text="Привет!"):
-        self.initial_greeting = greeting_text
+    def stop(self):
+        self._stopped = True
+        try:
+            sd.stop()
+        except Exception:
+            pass
+        if self.isRunning():
+            self.wait(200)
+
+    def start_warmup(self, greeting_text=None, phrase=None):
+        self.stop()
+        self._is_warmup = True
+        self._play_cached_flag = False
+        if phrase:
+            self.warmup_text = phrase
+        if greeting_text:
+            self.greeting_to_precache = greeting_text
+        self.start()
+
+    def play_cached_greeting(self):
+        if self.cached_greeting_audio is not None:
+            self.stop()
+            self._stopped = False
+            self._is_warmup = False
+            self._play_cached_flag = True
+            self.start()
+        else:
+            self.say(self.greeting_to_precache if self.greeting_to_precache else "Привет!")
+
+    def say(self, text, speaker='kseniya'):
+        self.stop()
+        self._is_warmup = False
+        self._play_cached_flag = False
+        self.text_to_speak = text
+        self.speaker = speaker
         self.start()
 
     def run(self):
+        self._stopped = False
         try:
-            self._init_model()
+            if not self.model:
+                self._init_model()
 
-            raw_text = self.initial_greeting if self.initial_greeting else self.text_to_speak
-            self.initial_greeting = ""
+            if self._is_warmup:
+                cleaned_warmup = self._clean_text_for_tts(self.warmup_text)
+                if self.model and cleaned_warmup and not self._stopped:
+                    with torch.inference_mode():
+                        _ = self.model.apply_tts(
+                            text=cleaned_warmup,
+                            speaker=self.speaker,
+                            sample_rate=self.sample_rate
+                        )
 
-            text = self._clean_text_for_tts(raw_text)
+                if self.greeting_to_precache and not self._stopped:
+                    cleaned_greeting = self._clean_text_for_tts(self.greeting_to_precache)
+                    with torch.inference_mode():
+                        audio = self.model.apply_tts(
+                            text=cleaned_greeting,
+                            speaker=self.speaker,
+                            sample_rate=self.sample_rate
+                        )
+                    audio_np = audio.numpy()
+                    audio_np = self._soften_audio(audio_np, cutoff=7000)
+                    padding = np.zeros(int(self.sample_rate * 0.2), dtype=np.float32)
+                    self.cached_greeting_audio = np.concatenate([audio_np, padding])
 
-            if not text:
+                self.warmup_finished.emit()
+                return
+
+            if self._play_cached_flag:
+                self._play_cached_flag = False
+                if self.cached_greeting_audio is not None and not self._stopped:
+                    self.speaking_started.emit()
+                    sd.play(self.cached_greeting_audio, self.sample_rate)
+                    while sd.get_stream() and sd.get_stream().active:
+                        if self._stopped:
+                            sd.stop()
+                            break
+                        sd.sleep(40)
+                return
+
+            text = self._clean_text_for_tts(self.text_to_speak)
+            if not text or self._stopped:
                 return
 
             with torch.inference_mode():
@@ -94,25 +162,29 @@ class TTSThread(QThread):
                     sample_rate=self.sample_rate
                 )
 
+            if self._stopped:
+                return
+
             audio_np = audio.numpy()
             audio_np = self._soften_audio(audio_np, cutoff=7000)
 
-            padding = np.zeros(int(self.sample_rate * 0.4), dtype=np.float32)
+            padding = np.zeros(int(self.sample_rate * 0.2), dtype=np.float32)
             audio_padded = np.concatenate([audio_np, padding])
 
             self.speaking_started.emit()
             sd.play(audio_padded, self.sample_rate)
-            sd.wait()
+
+            while sd.get_stream() and sd.get_stream().active:
+                if self._stopped:
+                    sd.stop()
+                    break
+                sd.sleep(40)
+
         except Exception as e:
             print(f"[TTS Error]: {e}")
             self.error_occurred.emit(str(e))
+            if self._is_warmup:
+                self.warmup_finished.emit()
         finally:
-            self.speaking_finished.emit()
-
-    def say(self, text, speaker='kseniya'):
-        if self.isRunning():
-            sd.stop()
-            self.wait()
-        self.text_to_speak = text
-        self.speaker = speaker
-        self.start()
+            if not self._is_warmup:
+                self.speaking_finished.emit()

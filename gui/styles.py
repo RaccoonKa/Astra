@@ -9,7 +9,7 @@ QFrame#RightPanel {
     border-radius: 12px;
 }
 QFrame#SettingsPanel {
-    background-color: rgba(8, 8, 5, 0.95);
+    background-color: rgba(8, 8, 5, 0.94);
     border: none;
     border-radius: 12px;
 }
@@ -72,48 +72,108 @@ QPushButton#CloseBtn:hover {
     color: #ffffff;
 }
 
-/* СТИЛИ ДЛЯ ПАНЕЛИ НАСТРОЕК */
-QLabel#SettingsTitle {
+QLabel#SettingsMainTitle {
     color: #fffde7;
+    letter-spacing: 0.5px;
 }
-QLabel#SectionTitle {
+
+QFrame#SettingsCard {
+    background-color: rgba(18, 16, 10, 0.50);
+    border: 1px solid rgba(196, 160, 40, 0.22);
+    border-radius: 10px;
+}
+
+QLabel#CardHeader {
     color: #ffd700;
+    letter-spacing: 1px;
+    font-size: 11px;
+    text-transform: uppercase;
 }
-QLabel#SettingLabel {
-    color: #c4a028;
-}
-QLineEdit#SettingInput {
-    background-color: #050503;
+
+QLabel#ToggleLabel {
     color: #fffde7;
-    border: 1px solid #3a3010;
-    border-radius: 6px;
-    padding: 4px 8px;
+    font-size: 12px;
 }
-QLineEdit#SettingInput:focus {
-    border: 1px solid #c4a028;
-}
-QPushButton#InstructionBtn {
-    background-color: transparent;
-    color: #8c7320;
-    border: none;
-    padding: 2px 4px;
+
+QLabel#FieldLabel {
+    color: rgba(255, 253, 231, 0.85);
     font-size: 11px;
 }
-QPushButton#InstructionBtn:hover {
+
+QLineEdit#SettingInput {
+    background-color: rgba(4, 4, 3, 0.85);
     color: #ffd700;
-    text-decoration: underline;
+    border: 1px solid rgba(92, 78, 26, 0.5);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'Consolas', 'Segoe UI', monospace;
+    font-size: 11px;
 }
+QLineEdit#SettingInput:focus {
+    border: 1px solid #ffd700;
+    background-color: rgba(6, 6, 4, 0.95);
+}
+
+QComboBox#SettingCombo {
+    background-color: rgba(4, 4, 3, 0.85);
+    color: #ffd700;
+    border: 1px solid rgba(92, 78, 26, 0.5);
+    border-radius: 6px;
+    padding: 4px 28px 4px 10px;
+    font-size: 11px;
+}
+QComboBox#SettingCombo:focus {
+    border: 1px solid #ffd700;
+}
+QComboBox#SettingCombo::drop-down {
+    border: none;
+    background: transparent;
+    width: 0px;
+}
+QComboBox#SettingCombo::down-arrow {
+    image: none;
+    width: 0px;
+    height: 0px;
+    border: none;
+    background: transparent;
+}
+QComboBox QAbstractItemView {
+    background-color: #0d0a05;
+    color: #ffd700;
+    selection-background-color: #3a3010;
+    selection-color: #ffffff;
+    border: 1px solid #5c4e1a;
+    border-radius: 6px;
+    outline: none;
+}
+
+QPushButton#HintCircleBtn {
+    background-color: rgba(92, 78, 26, 0.25);
+    color: #c4a028;
+    border: 1px solid rgba(196, 160, 40, 0.35);
+    border-radius: 9px;
+    font-weight: bold;
+    font-size: 10px;
+}
+QPushButton#HintCircleBtn:hover {
+    background-color: rgba(255, 215, 0, 0.2);
+    color: #ffd700;
+    border: 1px solid #ffd700;
+}
+
 QPushButton#SaveSettingsButton {
-    background-color: #c4a028;
-    color: #0d0a05;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ede8db, stop:1 #d6cebe);
+    color: #121008;
     font-weight: bold;
     border: none;
     border-radius: 8px;
-    padding: 6px 14px;
+    padding: 8px 20px;
+    font-size: 12px;
 }
 QPushButton#SaveSettingsButton:hover {
-    background-color: #ffd700;
+    background: #ffffff;
 }
+
 QScrollArea#SettingsScroll {
     background: transparent;
     border: none;
@@ -122,20 +182,19 @@ QScrollArea#SettingsScroll > QWidget > QWidget {
     background: transparent;
 }
 
-/* ЭЛЕГАНТНЫЙ КАСТОМНЫЙ СКРОЛЛБАР */
 QScrollBar:vertical {
     border: none;
     background: transparent;
-    width: 6px;
-    margin: 0px 0px 0px 0px;
+    width: 4px;
+    margin: 0px;
 }
 QScrollBar::handle:vertical {
-    background: #3a3010;
+    background: rgba(92, 78, 26, 0.6);
     min-height: 25px;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 QScrollBar::handle:vertical:hover {
-    background: #c4a028;
+    background: #ffd700;
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     border: none;
@@ -144,31 +203,5 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
     background: none;
-}
-
-/* СТИЛИ ЧЕКБОКСОВ */
-QCheckBox#VisionCheckbox {
-    color: #fffde7;
-    spacing: 8px;
-}
-QCheckBox#VisionCheckbox::indicator {
-    width: 16px;
-    height: 16px;
-    border: 1px solid #3a3010;
-    border-radius: 4px;
-    background-color: #050503;
-}
-QCheckBox#VisionCheckbox::indicator:checked {
-    background-color: #c4a028;
-    border: 1px solid #ffd700;
-}
-QPushButton#BulbBtn {
-    background-color: transparent;
-    border: none;
-    font-size: 14px;
-    padding: 0px 4px;
-}
-QPushButton#BulbBtn:hover {
-    font-size: 16px;
 }
 """

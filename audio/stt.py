@@ -8,11 +8,11 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 
 class STTThread(QThread):
-    text_recognized = pyqtSignal(str)
+    text_recognized = pyqtSignal(str, bytes)
     listening_state_changed = pyqtSignal(bool)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, model_path="models/model_vosk", parent=None):
+    def __init__(self, model_path="optimized_models/model_vosk", parent=None):
         super().__init__(parent)
         self.model_path = model_path
         self._running = True
@@ -82,6 +82,7 @@ class STTThread(QThread):
 
         active_mode = False
         active_start_time = 0.0
+        utterance_buffer = bytearray()
 
         with stream:
             self.listening_state_changed.emit(False)
@@ -93,15 +94,18 @@ class STTThread(QThread):
                     except queue.Empty:
                         pass
                     continue
+
                 if self.manual_trigger_flag:
                     self.manual_trigger_flag = False
                     active_mode = True
                     active_start_time = time.time()
                     recognizer.Reset()
+                    utterance_buffer.clear()
                     self.listening_state_changed.emit(True)
 
                 if active_mode and (time.time() - active_start_time > 4.0):
                     active_mode = False
+                    utterance_buffer.clear()
                     self.listening_state_changed.emit(False)
 
                 try:
@@ -109,9 +113,13 @@ class STTThread(QThread):
                 except queue.Empty:
                     continue
 
+                utterance_buffer.extend(data)
+
                 if recognizer.AcceptWaveform(data):
                     result = json.loads(recognizer.Result())
                     text = result.get("text", "").strip()
+                    phrase_audio = bytes(utterance_buffer)
+                    utterance_buffer.clear()
 
                     if not text:
                         continue
@@ -122,7 +130,7 @@ class STTThread(QThread):
                         words = text.split()
                         command = " ".join(words[wake_idx + 1:]).strip()
                         if command:
-                            self.text_recognized.emit(command)
+                            self.text_recognized.emit(command, phrase_audio)
                             active_mode = False
                             self.listening_state_changed.emit(False)
                         else:
@@ -131,7 +139,7 @@ class STTThread(QThread):
                             recognizer.Reset()
                             self.listening_state_changed.emit(True)
                     elif active_mode:
-                        self.text_recognized.emit(text)
+                        self.text_recognized.emit(text, phrase_audio)
                         active_mode = False
                         self.listening_state_changed.emit(False)
 
