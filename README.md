@@ -65,6 +65,18 @@ A multi-model computer vision subsystem designed for fatigue diagnostics, biomet
 
 ---
 
+### 4. ASR Post-Correction (Acoustic Error Repair)
+
+A lightweight Seq2Seq post-processing pipeline based on fine-tuned **cointegrated/rut5-small**, running directly after acoustic speech recognition (Vosk):
+
+- **Contextual Phonetic Correction** (`train_corrector.py`):  
+  Translates noisy, phonetically corrupted ASR transcripts into grammatically structured commands, accurately restoring mangled service names, network utilities, and numbers (*"спатифай"* $\rightarrow$ *"спотифай"*, *"хадэ резка"* $\rightarrow$ *"хдрезка"*, *"вин вс"* $\rightarrow$ *"winws"*).
+
+- **ONNX CPU Low-Latency Inference** (`asr_corrector.py`):  
+  Full Encoder-Decoder graph compiled for **ONNX Runtime CPU** with anti-repetition penalty and length limits. Delivers ultra-low latency (~15–20 ms) with a compact memory footprint (~60 MB RAM).
+
+---
+
 ## 🛠 Tech Stack & Features
 
 I use modern approaches to make Astra not only smarter but also more efficient:
@@ -191,6 +203,18 @@ ml_research/
 
 - **Распознавание жестов** (`GestureDetector`):  
   Детекция фаланг пальцев и классификация жестов (кулак, открытая ладонь, указательный палец) для управления медиаплеером и блокировкой ПК.  
+
+---
+
+### 4. Пост-коррекция распознавания речи (ASR Post-Correction)
+
+Модуль исправления ошибок акустического распознавания на базе дообученной Seq2Seq-модели **cointegrated/rut5-small**, работающий в связке с Vosk:
+
+- **Контекстное исправление фонетических искажений** (`train_corrector.py`):  
+  Преобразует «сырой» фонетический вывод Vosk в грамматически корректные команды, восстанавливая искажённые названия сервисов, утилит и числительных (*«спатифай»* $\rightarrow$ *«спотифай»*, *«хадэ резка»* $\rightarrow$ *«хдрезка»*, *«вин вс»* $\rightarrow$ *«winws»*).
+
+- **Оптимизированный ONNX CPU инференс** (`asr_corrector.py`):  
+  Полный граф энкодер-декодер модели сконвертирован для выполнения на **ONNX Runtime CPU** со встроенной защитой от зацикливаний и повторений. Работает с задержкой всего ~15–20 мс и занимает ~60 МБ RAM.
 
 ---
 
