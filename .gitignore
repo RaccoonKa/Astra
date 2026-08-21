@@ -1,0 +1,13 @@
+# Персональные данные и токены
+personal_data/configs/config.json
+personal_data/configs/pairing_session.json
+personal_data/configs/user_memory.json
+personal_data/configs/.spotify_cache
+personal_data/configs/google/credentials.json
+personal_data/configs/google/token.json
+personal_data/owner_face/*
+
+# Исключения
+!personal_data/configs/config.py
+!personal_data/configs/config.template.json
+!personal_data/owner_face/.gitkeep
