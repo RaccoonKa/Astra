@@ -5,9 +5,11 @@ import atexit
 import warnings
 import threading
 import numpy as np
+from services.telegram.notifier import send_security_alert
+from services.telegram.telegram_bot import TelegramBotThread
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QFrame
+    QTextEdit, QLineEdit, QFrame, QFileDialog
 )
 from PyQt6.QtCore import (
     Qt, QPoint, QRectF, QTimer, QPropertyAnimation, QVariantAnimation,
@@ -94,6 +96,25 @@ class AudioVisualizerWorker(QThread):
         if self.isRunning():
             self.wait(200)
 
+class CommandWorker(QThread):
+    result_ready = pyqtSignal(object)
+
+    def __init__(self, parser, text, audio_data=None, is_voice=False, attached_file=None, parent=None):
+        super().__init__(parent)
+        self.parser = parser
+        self.text = text
+        self.audio_data = audio_data
+        self.is_voice = is_voice
+        self.attached_file = attached_file
+
+    def run(self):
+        response = self.parser.process_command(
+            self.text,
+            audio_data=self.audio_data,
+            is_voice=self.is_voice,
+            attached_file=self.attached_file
+        )
+        self.result_ready.emit(response)
 
 class AstraMicWidget(QFrame):
     clicked = pyqtSignal()
@@ -370,7 +391,37 @@ class ChatFrame(QFrame):
         self.chat_history.setReadOnly(True)
         layout.addWidget(self.chat_history)
 
+        self.attached_file = None
+
+        self.file_container = QWidget()
+        file_layout = QHBoxLayout(self.file_container)
+        file_layout.setContentsMargins(0, 0, 0, 4)
+        file_layout.setSpacing(6)
+
+        self.file_label = QLabel("")
+        self.file_label.setObjectName("FileLabel")
+        file_layout.addWidget(self.file_label)
+
+        self.remove_file_btn = QPushButton("✕")
+        self.remove_file_btn.setObjectName("RemoveFileBtn")
+        self.remove_file_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.remove_file_btn.setFixedSize(16, 16)
+        self.remove_file_btn.clicked.connect(self.clear_attachment)
+        file_layout.addWidget(self.remove_file_btn)
+        file_layout.addStretch()
+
+        self.file_container.hide()
+        layout.addWidget(self.file_container)
+
         input_layout = QHBoxLayout()
+
+        self.attach_button = QPushButton("📎")
+        self.attach_button.setObjectName("AttachBtn")
+        self.attach_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.attach_button.setFixedSize(30, 30)
+        self.attach_button.clicked.connect(self.select_file)
+        input_layout.addWidget(self.attach_button)
+
         self.input_field = QLineEdit()
         self.input_field.setObjectName("InputField")
         self.input_field.setPlaceholderText("Введите команду...")
@@ -383,6 +434,23 @@ class ChatFrame(QFrame):
 
         layout.addLayout(input_layout)
         self.setLayout(layout)
+
+    def select_file(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выберите файл для Астры",
+            "",
+            "Все поддерживаемые файлы (*.txt *.pdf *.docx *.png *.jpg *.jpeg *.bmp *.webp *.md *.py *.json *.csv *.log);;Изображения (*.png *.jpg *.jpeg *.bmp *.webp);;Тексты и Документы (*.txt *.pdf *.docx *.md *.py *.json *.csv *.log)"
+        )
+        if path:
+            self.attached_file = path
+            self.file_label.setText(f"📎 {os.path.basename(path)}")
+            self.file_container.show()
+
+    def clear_attachment(self):
+        self.attached_file = None
+        self.file_label.clear()
+        self.file_container.hide()
 
     def animate_border(self):
         self.border_phase += 0.010
@@ -617,6 +685,12 @@ class MainWindow(QWidget):
 
         atexit.register(self.ducker.restore)
 
+        self.telegram_thread = None
+        cfg_keys = self.config.get("api_keys", {}) if isinstance(self.config, dict) else {}
+        if cfg_keys.get("telegram_token"):
+            self.telegram_thread = TelegramBotThread(parent=self)
+            self.telegram_thread.start()
+
     def init_ui(self):
         base_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
         font_path = os.path.join(base_dir, "assets", "fonts", "Schiffbauer-Regular.otf")
@@ -751,6 +825,32 @@ class MainWindow(QWidget):
         self.settings_anim_group = QParallelAnimationGroup(self)
         self.chat_anim_group = QParallelAnimationGroup(self)
 
+    def on_deep_drowsiness(self):
+        cfg = self.config if isinstance(self.config, dict) else (
+            SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
+        )
+        if not cfg.get("modules", {}).get("eye_tracking", False):
+            return
+
+        user_name = cfg.get("user_name", "друг")
+        msg = f"{user_name}, тебе нужно поспать! Не забывай о своём здоровье!"
+
+        self.chat_history.append(f"Астра: {msg}\n")
+        self.speak_reply(msg)
+
+    def on_frequent_blinking(self):
+        cfg = self.config if isinstance(self.config, dict) else (
+            SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
+        )
+        if not cfg.get("modules", {}).get("eye_tracking", False):
+            return
+
+        user_name = cfg.get("user_name", "друг")
+        msg = f"{user_name}, сделай перерыв и отдохни!"
+
+        self.chat_history.append(f"Астра: {msg}\n")
+        self.speak_reply(msg)
+
     def set_ui_interactive(self, enabled: bool):
         self.settings_btn.setEnabled(enabled)
         self.toggle_chat_btn.setEnabled(enabled)
@@ -825,6 +925,8 @@ class MainWindow(QWidget):
 
         self.vision_thread.face_detected_signal.connect(self.presence_manager.process_face_status)
         self.vision_thread.gesture_detected_signal.connect(self.on_gesture_detected)
+        self.vision_thread.deep_drowsiness_signal.connect(self.on_deep_drowsiness)
+        self.vision_thread.frequent_blinking_signal.connect(self.on_frequent_blinking)
 
         user_name = "друг"
         if isinstance(self.config, dict):
@@ -856,8 +958,14 @@ class MainWindow(QWidget):
         cfg = self.config if isinstance(self.config, dict) else (
             SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
         )
-        if not cfg.get("modules", {}).get("vision", True):
+        if not cfg.get("modules", {}).get("face_recognition", False):
             return
+
+        current_frame = getattr(self.vision_thread, "current_frame", None) if self.vision_thread else None
+        send_security_alert(
+            frame_or_path=current_frame,
+            caption="⚠️ Внимание! Обнаружен посторонний пользователь. Система заблокирована."
+        )
 
         self.tts_thread.say("Обнаружен посторонний пользователь. Блокирую систему.")
         SystemActions.lock_screen()
@@ -866,7 +974,7 @@ class MainWindow(QWidget):
         cfg = self.config if isinstance(self.config, dict) else (
             SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
         )
-        if not cfg.get("modules", {}).get("gestures", True):
+        if not cfg.get("modules", {}).get("gestures", False):
             return
 
         if gesture_name == "open_palm":
@@ -884,7 +992,20 @@ class MainWindow(QWidget):
         if not self.ui_revealed:
             return
 
-        response = self.command_parser.process_command(text, audio_data=audio_data, is_voice=True)
+        if getattr(self.right_panel, 'attached_file', None):
+            self.chat_history.append(f"Вы (голос): {text}")
+            msg = "У тебя прикреплен файл. Чтобы я его изучила, пожалуйста, напиши свой вопрос текстом и нажми 'Отправить'."
+            self.chat_history.append(f"Астра: {msg}\n")
+            self.speak_reply(msg)
+            return
+
+        self.chat_history.append(f"Вы (голос): {text}")
+
+        self.voice_worker = CommandWorker(self.command_parser, text, audio_data=audio_data, is_voice=True, parent=self)
+        self.voice_worker.result_ready.connect(self.on_voice_command_finished)
+        self.voice_worker.start()
+
+    def on_voice_command_finished(self, response):
         if response:
             if isinstance(response, dict):
                 chat_text = response.get("chat", "")
@@ -897,7 +1018,6 @@ class MainWindow(QWidget):
             self.left_panel.set_emotion(emotion)
 
             if chat_text:
-                self.chat_history.append(f"Вы (голос): {text}")
                 self.chat_history.append(f"Астра: {chat_text}\n")
 
                 if isinstance(response, dict) and "Список доступных вариантов обхода" in chat_text:
@@ -909,6 +1029,49 @@ class MainWindow(QWidget):
         else:
             emotion = getattr(self.command_parser, "last_emotion", "neutral")
             self.left_panel.set_emotion(emotion)
+
+    def send_message(self):
+        if not self.ui_revealed:
+            return
+
+        text = self.input_field.text().strip()
+        attached_file = self.right_panel.attached_file
+
+        if text or attached_file:
+            user_msg = text if text else "Изучи прикрепленный файл"
+
+            if attached_file:
+                filename = os.path.basename(attached_file)
+                self.chat_history.append(f"Вы: {user_msg} [📎 {filename}]")
+            else:
+                self.chat_history.append(f"Вы: {user_msg}")
+
+            self.input_field.clear()
+            self.input_field.setEnabled(False)
+            self.send_button.setEnabled(False)
+            self.right_panel.clear_attachment()
+
+            self.text_worker = CommandWorker(self.command_parser, text, is_voice=False, attached_file=attached_file,
+                                             parent=self)
+            self.text_worker.result_ready.connect(self.on_text_command_finished)
+            self.text_worker.start()
+
+    def on_text_command_finished(self, response):
+        self.input_field.setEnabled(True)
+        self.send_button.setEnabled(True)
+        self.input_field.setFocus()
+
+        if response:
+            if isinstance(response, dict):
+                chat_text = response.get("chat", "") or response.get("voice", "")
+                voice_text = response.get("voice", "")
+            else:
+                chat_text = voice_text = str(response)
+
+            if chat_text:
+                self.chat_history.append(f"Астра: {chat_text}\n")
+            if voice_text:
+                self.speak_reply(voice_text)
 
     def on_stt_error(self, err):
         pass
@@ -927,6 +1090,8 @@ class MainWindow(QWidget):
         self.stop_vision()
         if hasattr(self, 'stt_thread') and self.stt_thread.isRunning():
             self.stt_thread.stop_thread()
+        if hasattr(self, 'telegram_thread') and self.telegram_thread and self.telegram_thread.isRunning():
+            self.telegram_thread.stop()
 
     def toggle_settings(self):
         self.settings_anim_group.stop()
@@ -1044,19 +1209,47 @@ class MainWindow(QWidget):
     def send_message(self):
         if not self.ui_revealed:
             return
-        text = self.input_field.text().strip()
-        if text:
-            self.chat_history.append(f"Вы: {text}")
-            response = self.command_parser.process_command(text, is_voice=False)
-            if response:
-                if isinstance(response, dict):
-                    chat_text = response.get("chat", "") or response.get("voice", "")
-                    voice_text = response.get("voice", "")
-                else:
-                    chat_text = voice_text = str(response)
 
-                if chat_text:
-                    self.chat_history.append(f"Астра: {chat_text}\n")
-                if voice_text:
-                    self.speak_reply(voice_text)
+        text = self.input_field.text().strip()
+        attached_file = self.right_panel.attached_file
+
+        if text or attached_file:
+            user_msg = text if text else "Изучи прикрепленный файл"
+
+            if attached_file:
+                filename = os.path.basename(attached_file)
+                self.chat_history.append(f"Вы: {user_msg} [📎 {filename}]")
+            else:
+                self.chat_history.append(f"Вы: {user_msg}")
+
             self.input_field.clear()
+            self.input_field.setEnabled(False)
+            self.send_button.setEnabled(False)
+            self.right_panel.clear_attachment()
+
+            self.text_worker = CommandWorker(
+                self.command_parser,
+                text,
+                is_voice=False,
+                attached_file=attached_file,
+                parent=self
+            )
+            self.text_worker.result_ready.connect(self.on_text_command_finished)
+            self.text_worker.start()
+
+    def on_text_command_finished(self, response):
+        self.input_field.setEnabled(True)
+        self.send_button.setEnabled(True)
+        self.input_field.setFocus()
+
+        if response:
+            if isinstance(response, dict):
+                chat_text = response.get("chat", "") or response.get("voice", "")
+                voice_text = response.get("voice", "")
+            else:
+                chat_text = voice_text = str(response)
+
+            if chat_text:
+                self.chat_history.append(f"Астра: {chat_text}\n")
+            if voice_text:
+                self.speak_reply(voice_text)

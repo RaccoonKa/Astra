@@ -5,6 +5,7 @@ import time
 import sounddevice as sd
 import vosk
 from PyQt6.QtCore import QThread, pyqtSignal
+from core.nlp.asr_corrector import ASRCorrector
 
 
 class STTThread(QThread):
@@ -20,6 +21,7 @@ class STTThread(QThread):
         self.audio_queue = queue.Queue()
         self.manual_trigger_flag = False
         self.is_speaking = False
+        self.corrector = ASRCorrector()
 
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         config_path = os.path.join(base_dir, "config.template.json")
@@ -128,8 +130,9 @@ class STTThread(QThread):
 
                     if has_wake:
                         words = text.split()
-                        command = " ".join(words[wake_idx + 1:]).strip()
-                        if command:
+                        raw_command = " ".join(words[wake_idx + 1:]).strip()
+                        if raw_command:
+                            command = self.corrector.correct(raw_command)
                             self.text_recognized.emit(command, phrase_audio)
                             active_mode = False
                             self.listening_state_changed.emit(False)
@@ -139,7 +142,8 @@ class STTThread(QThread):
                             recognizer.Reset()
                             self.listening_state_changed.emit(True)
                     elif active_mode:
-                        self.text_recognized.emit(text, phrase_audio)
+                        command = self.corrector.correct(text)
+                        self.text_recognized.emit(command, phrase_audio)
                         active_mode = False
                         self.listening_state_changed.emit(False)
 

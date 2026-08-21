@@ -1,5 +1,4 @@
 import os
-import json
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -10,11 +9,9 @@ SCOPES = [
     'https://www.googleapis.com/auth/youtube.readonly'
 ]
 
-
 class GoogleContactsManager:
     def __init__(self):
         self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
         self.config_dir = os.path.join(self.base_dir, "personal_data", "configs", "google")
         os.makedirs(self.config_dir, exist_ok=True)
 
@@ -59,7 +56,7 @@ class GoogleContactsManager:
             results = service.people().connections().list(
                 resourceName='people/me',
                 pageSize=100,
-                personFields='names,phoneNumbers'
+                personFields='names,phoneNumbers,emailAddresses'
             ).execute()
 
             connections = results.get('connections', [])
@@ -68,27 +65,33 @@ class GoogleContactsManager:
             for person in connections:
                 names = person.get('names', [])
                 phones = person.get('phoneNumbers', [])
+                emails = person.get('emailAddresses', [])
 
-                if names and phones:
-                    name = names[0].get('displayName')
-                    phone = phones[0].get('value')
-                    contacts_list.append({'name': name, 'phone': phone})
+                name = names[0].get('displayName') if names else None
+                phone = phones[0].get('value') if phones else None
+                email = emails[0].get('value') if emails else None
+
+                if name and (phone or email):
+                    contacts_list.append({
+                        'name': name,
+                        'phone': phone,
+                        'email': email
+                    })
 
             return contacts_list
         except Exception as e:
             print(f"[GOOGLE CONTACTS ERROR]: {e}")
             return []
 
-    def find_phone_by_name(self, target_name):
+    def find_contact(self, target_name):
         contacts = self.get_contacts()
         if not contacts or not target_name:
             return None
 
         target_low = target_name.lower().strip()
-
         for c in contacts:
             c_name = c['name'].lower()
             if target_low in c_name or c_name in target_low:
-                return c['phone']
+                return c
 
         return None

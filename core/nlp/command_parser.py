@@ -1,4 +1,5 @@
 import os
+
 os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
@@ -12,6 +13,8 @@ from services.vpn.vpn_manager import VpnManager
 from core.nlp.llm_provider import GigaChatProvider
 from core.nlp.nlu import JointNLU
 from core.nlp.emotion_classifier import EmotionClassifier, EMOTION_TRANSLATION
+from core.nlp.document_parser import DocumentParser
+from services.telegram.user_client import TelegramUserManager
 
 tf_logging.set_verbosity_error()
 
@@ -46,6 +49,7 @@ class CommandParser:
         self.threshold = confidence_threshold
         self.llm = GigaChatProvider()
         self.emotion_classifier = EmotionClassifier()
+        self.doc_parser = DocumentParser()
         self.waiting_for_zapret = False
         self.waiting_for_vpn = False
         self.last_emotion = "neutral"
@@ -67,6 +71,10 @@ class CommandParser:
 
         self.loader_thread = threading.Thread(target=self._load_model, daemon=True)
         self.loader_thread.start()
+
+        self.tg_user_mgr = TelegramUserManager()
+        self.waiting_for_tg_msg = False
+        self.tg_recipient = None
 
     def _load_model(self):
         try:
@@ -181,7 +189,8 @@ class CommandParser:
             "споти", "spotify"
         ]
         if any(trig in text_low for trig in spotify_case_triggers):
-            if any(verb in text_low for verb in ["включ", "постав", "сыграй", "вруби", "запуст", "проиграй", "найди", "открой", "слуша"]):
+            if any(verb in text_low for verb in
+                   ["включ", "постав", "сыграй", "вруби", "запуст", "проиграй", "найди", "открой", "слуша"]):
                 return "play_music"
 
         if len(words) > 7:
@@ -191,7 +200,8 @@ class CommandParser:
                 "потише", "погромче", "скрин", "залочь", "заблокируй",
                 "спотик", "спотиф", "яндекс", "музык", "трек", "песн", "запрет", "обход", "работ", "отдых"
             ]
-            if not any(root in text_low for root in strict_command_roots) and not has_generic_vpn and parsed_vpn == "none":
+            if not any(
+                    root in text_low for root in strict_command_roots) and not has_generic_vpn and parsed_vpn == "none":
                 return "chat"
 
         if "как" in text_low and any(w in text_low for w in ["дел", "жизн", "оно", "делишк", "пожива"]):
@@ -284,16 +294,70 @@ class CommandParser:
 
         return None
 
-    def process_command(self, text, audio_data=None, is_voice=False):
-        if not text:
+    def process_command(self, text, audio_data=None, is_voice=False, attached_file=None):
+        if not text and not attached_file:
             return ""
 
-        text_low = text.lower().strip()
+        text_low = text.lower().strip() if text else ""
 
         emotion, emo_conf = self.emotion_classifier.predict(audio_data)
         self.last_emotion = emotion
         emo_desc = EMOTION_TRANSLATION.get(emotion, "нейтральный")
-        print(f"[EMOTION]: Интонация пользователя: {emotion} ({int(emo_conf * 100)}%) ➔ [{emo_desc}]")
+
+        if attached_file:
+            file_text = self.doc_parser.parse_file(attached_file)
+
+            if len(file_text) > 15000:
+                file_text = file_text[:15000] + "\n\n... [Текст обрезан из-за лимита токенов]"
+
+            if file_text.strip():
+                prompt = text if text else "Изучи этот документ и расскажи кратко, о чем он."
+                ans = self.llm.ask_with_context(prompt, file_text)
+                return {"chat": ans, "voice": ans, "emotion": emotion}
+            else:
+                msg = "Не удалось распознать текст в этом файле."
+                return {"chat": msg, "voice": msg, "emotion": emotion}
+
+        if self.waiting_for_tg_msg:
+            if any(w in text_low for w in ["отмена", "забудь", "не надо", "хватит", "стоп"]):
+                self.waiting_for_tg_msg = False
+                self.tg_recipient = None
+                return {
+                    "chat": "Отправка сообщения отменена.",
+                    "voice": "Отменила отправку.",
+                    "emotion": emotion
+                }
+
+            msg_to_send = text
+            target = self.tg_recipient
+            self.waiting_for_tg_msg = False
+            self.tg_recipient = None
+
+            success, info = self.tg_user_mgr.send_message_sync(target, msg_to_send)
+            if success:
+                return {
+                    "chat": f"Сообщение для {target.title()} отправлено: «{msg_to_send}»",
+                    "voice": "Отправила!",
+                    "emotion": emotion
+                }
+            else:
+                return {
+                    "chat": f"Не удалось отправить: {info}",
+                    "voice": "Не смогла отправить сообщение.",
+                    "emotion": emotion
+                }
+
+        tg_match = re.search(
+            r'\b(?:отправь сообщение|напиши сообщение|напиши|отправь)\s+(?:контакту\s+)?([а-яa-z0-9_@]+)', text_low)
+        if tg_match and not any(w in text_low for w in ["музык", "трек", "видео", "обход", "запрет", "пк", "комп"]):
+            target_name = tg_match.group(1).strip()
+            self.waiting_for_tg_msg = True
+            self.tg_recipient = target_name
+            return {
+                "chat": f"Кому: {target_name.title()}. Что отправить?",
+                "voice": "Что отправить?",
+                "emotion": emotion
+            }
 
         if self.waiting_for_zapret:
             num = self._extract_zapret_number(text_low)
@@ -400,8 +464,7 @@ class CommandParser:
             return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion}
 
         if rule_intent == "chat":
-            print(f"[PARSER]: Услышано '{text}' -> Разговорное правило -> GigaChat")
-            prompt_with_emotion = f"[{emo_desc}] {text}" if emotion in ["sad", "angry", "happy"] else text
+            prompt_with_emotion = f"[{emo_desc}] {text}" if emotion in ["sad", "happy"] else text
             ans = self.llm.ask(prompt_with_emotion)
             return {"chat": ans, "voice": ans, "emotion": emotion}
 
@@ -418,7 +481,6 @@ class CommandParser:
         else:
             if self.nlu:
                 intent, confidence, slots = self.nlu.predict(text)
-                print(f"[PARSER]: Услышано '{text}' -> JointNLU: {intent} ({int(confidence * 100)}%)")
                 if confidence < self.threshold:
                     intent = None
 
@@ -435,15 +497,16 @@ class CommandParser:
                         res = action_func()
 
                 if res is not None:
-                    if emotion == "angry" and res == "Сделала":
-                        res_str = "Сделала, всё спокойно."
-                    else:
-                        res_str = str(res)
+                    res_str = str(res)
+                    if emotion == "sad" and intent in ["play_music", "mode_rest"]:
+                        res_str = f"{res_str}... Надеюсь, это поможет тебе почувствовать себя лучше 💛 Если захочешь выговориться — я рядом."
+                    elif emotion == "happy" and intent in ["play_music", "mode_rest"]:
+                        res_str = f"{res_str}! Рада твоему классному настроению ✨"
 
                     if intent in ["start_vpn", "stop_vpn"]:
                         return {"chat": "" if is_voice else res_str, "voice": res_str, "emotion": emotion}
                     return {"chat": res_str, "voice": res_str, "emotion": emotion}
 
-        prompt_with_emotion = f"(Пользователь говорит с интонацией: {emo_desc}) {text}"
+        prompt_with_emotion = f"[Интонация пользователя: {emo_desc}] {text}" if emotion in ["sad", "happy"] else text
         ans = self.llm.ask(prompt_with_emotion)
         return {"chat": ans, "voice": ans, "emotion": emotion}

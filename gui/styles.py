@@ -38,6 +38,24 @@ QPushButton#SendButton {
 QPushButton#SendButton:hover {
     background-color: #ffffff;
 }
+QPushButton#AttachBtn {
+    background-color: rgba(92, 78, 26, 0.25);
+    color: #ffd700;
+    font-size: 14px;
+    border: 1px solid rgba(196, 160, 40, 0.35);
+    border-radius: 8px;
+}
+QPushButton#AttachBtn:hover {
+    background-color: rgba(255, 215, 0, 0.2);
+    border: 1px solid #ffd700;
+}
+QLabel#FileLabel {
+    color: #ffd700;
+    font-size: 11px;
+    font-style: italic;
+    background: transparent;
+    padding-bottom: 4px;
+}
 QPushButton#TitleBtn {
     background-color: transparent;
     color: #5c4e1a;
@@ -161,6 +179,19 @@ QPushButton#HintCircleBtn:hover {
     border: 1px solid #ffd700;
 }
 
+QPushButton#GuideCircleBtn {
+    background-color: rgba(92, 78, 26, 0.25);
+    color: #ffd700;
+    border: 1px solid rgba(196, 160, 40, 0.35);
+    border-radius: 9px;
+    font-size: 10px;
+}
+QPushButton#GuideCircleBtn:hover {
+    background-color: rgba(255, 215, 0, 0.25);
+    color: #ffffff;
+    border: 1px solid #ffd700;
+}
+
 QPushButton#SaveSettingsButton {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ede8db, stop:1 #d6cebe);
     color: #121008;
@@ -203,5 +234,41 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
     background: none;
+}
+QPushButton#RemoveFileBtn {
+    background-color: transparent;
+    color: #ff5252;
+    font-size: 11px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    padding: 0px;
+}
+QPushButton#RemoveFileBtn:hover {
+    background-color: rgba(255, 82, 82, 0.2);
+    color: #ff7b7b;
+}
+
+QTextEdit#GuideContent {
+    background-color: rgba(14, 12, 7, 0.65);
+    color: #fffde7;
+    border: 1px solid rgba(196, 160, 40, 0.25);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+QPushButton#GuideCloseBtn {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ede8db, stop:1 #d6cebe);
+    color: #121008;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 16px;
+    font-size: 14px;
+}
+QPushButton#GuideCloseBtn:hover {
+    background: #ffffff;
 }
 """
