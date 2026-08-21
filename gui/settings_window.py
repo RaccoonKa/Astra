@@ -3,9 +3,10 @@ import sys
 import json
 import math
 import winreg
+import shutil
 from PyQt6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QScrollArea, QWidget, QComboBox, QDialog, QTextEdit
+    QPushButton, QScrollArea, QWidget, QComboBox, QDialog, QTextEdit, QFileDialog
 )
 from PyQt6.QtCore import (
     Qt, QTimer, QRectF, QPoint, QPointF, pyqtSignal,
@@ -20,13 +21,14 @@ SPEECH_HINTS = {
     "autostart": "Включив автозапуск, я буду просыпаться одновременно с твоим компьютером! Тебе даже не придется искать мою иконку — я сразу буду тут, готова помогать.",
     "user_gender": "Выбери свой пол, чтобы я правильно обращалась к тебе и никогда не путала окончания слов!",
     "vpn_service": "Выбери, какую виртуальную сеть ты используешь! Я смогу автоматически запускать и переключать её по голосовой команде.",
-    "telegram_pair": "Включив эту функцию, я смогу дистанционно управлять твоим компьютером! Смогу управлять твоей камерой, питанием, а также отправлять сообщения твоим друзьям и близким!",
+    "telegram_pair": "Включив эту функцию, я смогу дистанционно управлять твоим компьютером или просто общаться с тобой прямо в телеграме! Смогу управлять твоей камерой, питанием, статусом компьютера.",
     "face_recognition": "Если включишь эту функцию, я буду узнавать тебя в лицо! Смогу радостно здороваться при твоем возвращении и защищать систему от чужих глаз.",
     "eye_tracking": "С этой функцией я смогу следить за твоими глазками. Если замечу, что часто моргаешь или долго сидишь с закрытыми глазами — я заботливо предложу отдохнуть!",
     "gestures": "С жестами я смогу понимать тебя без слов! Покажешь кулак — заблокирую твой компьютер, чтобы никто не получил к нему доступ кроме тебя. Покажешь ладонь — поставлю музыку на паузу. Почти магия!",
     "music_service": "Выбери, где мне включать музыку! Если переключатель включен — я буду ставить треки и запускать твою волну рекомендаций в Спотике, а если выключен — в +Яндексе.",
     "gigachat": "Это мой главный ум и вдохновение! Вставив ключ Гигачата, ты дашь мне возможность болтать с тобой обо всём на свете, шутить и отвечать на любые вопросы.",
     "yandex": "Доверь мне свой плейлист! Я смогу запускать твою волну, включать треки под настроение и ставить лайки.",
+    "yandex_iot": "С этим +токеном я смогу управлять твоим умным домом! Включать и выключать свет, менять яркость лампочек, управлять розетками и запускать сценарии в Доме с Алисой.",
     "spotify": "Здесь указываются айди клиента и ключ клиента из твоего личного кабинета Спотиф+ая. Заполни плашки и я смогу включать тебе музыку в Спотике.",
     "weather": "Этот ключ нужен, чтобы я всегда знала, брать ли тебе зонтик. Я смогу рассказывать свежий прогноз погоды и температуру за окном!",
     "google": "Подключив сервисы Гугл, ты откроешь мне доступ к Ютубу и контактам. Я смогу искать и разворачивать видео на весь экран, а также помогать связываться с друзьями!",
@@ -55,6 +57,15 @@ API_GUIDES = {
         "text": "1. Авторизуйся в браузере в своём Яндекс аккаунте с активной подпиской Яндекс Плюс.\n"
                 "2. Воспользуйся утилитой получения токена (например, через консольную команду 'yandex-music-token' или специальное браузерное расширение).\n"
                 "3. Скопируй полученную строку токена и вставь в это поле."
+    },
+    "yandex_iot": {
+        "title": "Как получить токен Умного дома Яндекса",
+        "text": "1. Перейди на oauth.yandex.ru/client/new и выбери 'Для доступа к API или отладки'.\n"
+                "2. Укажи название (например, Astra Smart Home) и платформу 'Веб-сервисы' с Redirect URI: https://oauth.yandex.ru/verification_code\n"
+                "3. В разделе прав доступа найди 'Умный дом' (IoT) и отметь iot:view и iot:control.\n"
+                "4. Создай приложение, скопируй полученный ClientID и открой ссылку:\n"
+                "https://oauth.yandex.ru/authorize?response_type=token&client_id=ТВОЙ_CLIENT_ID\n"
+                "5. Войди под аккаунтом владельца умного дома, нажми 'Разрешить', скопируй токен из адресной строки браузера (после access_token=) и вставь в это поле."
     },
     "spotify": {
         "title": "Как получить Client ID и Secret Spotify",
@@ -604,6 +615,31 @@ class SettingsFrame(QFrame):
                                                                  "face_recognition")
         layout_vision.addLayout(row_face)
 
+        self.add_face_btn_settings = QPushButton("📸 Добавить своё фото")
+        self.add_face_btn_settings.setFont(QFont(self.font_family, 10, QFont.Weight.Bold))
+        self.add_face_btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_face_btn_settings.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(92, 78, 26, 0.25);
+                color: #ffd700;
+                border: 1px solid rgba(196, 160, 40, 0.35);
+                border-radius: 8px;
+                padding: 4px 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 215, 0, 0.2);
+                border: 1px solid #ffd700;
+            }
+        """)
+        self.add_face_btn_settings.clicked.connect(self._add_owner_face)
+
+        row_face_btn = QHBoxLayout()
+        row_face_btn.setContentsMargins(4, 0, 4, 6)
+        row_face_btn.addWidget(self.add_face_btn_settings)
+        row_face_btn.addStretch()
+
+        layout_vision.addLayout(row_face_btn)
+
         row_eye, self.eye_tracking_toggle = self._create_toggle_row("Отслеживание усталости глаз", "eye_tracking")
         layout_vision.addLayout(row_eye)
 
@@ -631,6 +667,11 @@ class SettingsFrame(QFrame):
             "Токен Яндекс Музыки:", "Вставьте токен Яндекс Музыки...", "yandex", "yandex"
         )
         layout_keys.addLayout(box_ya)
+
+        box_ya_iot, self.yandex_iot_input = self._create_field_block(
+            "Токен Умного Дома Яндекса:", "Вставьте токен Яндекс IoT...", "yandex_iot", "yandex_iot"
+        )
+        layout_keys.addLayout(box_ya_iot)
 
         box_sp_id, self.spotify_id_input = self._create_field_block(
             "Spotify Client ID:", "Вставьте Spotify Client ID...", "spotify", "spotify"
@@ -684,6 +725,22 @@ class SettingsFrame(QFrame):
         main_layout.addLayout(btn_container)
 
         self.setLayout(main_layout)
+
+    def _add_owner_face(self):
+        files, _ = QFileDialog.getOpenFileNames(self, "Выбери свои фото", "", "Images (*.png *.jpg *.jpeg)")
+        if files:
+            face_dir = os.path.join(os.path.dirname(self.config_path), "..", "owner_face")
+            os.makedirs(face_dir, exist_ok=True)
+            count = 0
+            for f in files:
+                try:
+                    shutil.copy(f, os.path.join(face_dir, os.path.basename(f)))
+                    count += 1
+                except Exception:
+                    pass
+            self.status_label.setText(f"✓ Добавлено фото: {count} шт.")
+            self.status_label.setStyleSheet("color: #ffd700; font-size: 11px; font-weight: bold;")
+            QTimer.singleShot(2500, lambda: self.status_label.setText(""))
 
     def _apply_windows_autostart(self, enabled: bool):
         app_name = "AstraAssistant"
@@ -741,6 +798,7 @@ class SettingsFrame(QFrame):
 
                     self.gigachat_input.setText(api_keys.get("gigachat", ""))
                     self.yandex_input.setText(api_keys.get("yandex_music_token", ""))
+                    self.yandex_iot_input.setText(api_keys.get("yandex_iot_token", ""))
                     self.spotify_id_input.setText(api_keys.get("spotify_client_id", ""))
                     self.spotify_secret_input.setText(api_keys.get("spotify_client_secret", ""))
                     self.weather_input.setText(api_keys.get("weather", ""))
@@ -809,6 +867,7 @@ class SettingsFrame(QFrame):
         gigachat_key = self.gigachat_input.text().strip()
         config_data["api_keys"]["gigachat"] = gigachat_key
         config_data["api_keys"]["yandex_music_token"] = self.yandex_input.text().strip()
+        config_data["api_keys"]["yandex_iot_token"] = self.yandex_iot_input.text().strip()
         config_data["api_keys"]["spotify_client_id"] = self.spotify_id_input.text().strip()
         config_data["api_keys"]["spotify_client_secret"] = self.spotify_secret_input.text().strip()
         config_data["api_keys"]["weather"] = self.weather_input.text().strip()

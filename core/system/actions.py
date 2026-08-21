@@ -18,6 +18,8 @@ from services.google.youtube_manager import YouTubeManager
 from services.spotify.spotify_manager import SpotifyManager
 from services.zapret.zapret import ZapretManager
 from services.vpn.vpn_manager import VpnManager
+from services.yandex.smart_home_manager import SmartHomeManager
+
 
 pyautogui.FAILSAFE = False
 
@@ -27,6 +29,7 @@ yt_manager = YouTubeManager()
 spotify_manager = SpotifyManager()
 zapret_manager = ZapretManager()
 vpn_manager = VpnManager()
+smart_home_manager = SmartHomeManager()
 
 MUSIC_PHRASES = [
     "Твоя музыка заставляет меня работать быстрее.",
@@ -450,6 +453,20 @@ class SystemActions:
         return ""
 
     @staticmethod
+    def smart_home_on(text="", slots=None):
+        return smart_home_manager.turn_on(text)
+
+    @staticmethod
+    def smart_home_off(text="", slots=None):
+        return smart_home_manager.turn_off(text)
+
+    @staticmethod
+    def smart_home_brightness(text="", slots=None):
+        num = extract_number(text)
+        val = num if num is not None else 50
+        return smart_home_manager.set_brightness(val, text)
+
+    @staticmethod
     def open_spotify():
         if spotify_manager._is_spotify_installed():
             if spotify_manager._launch_app():
@@ -839,7 +856,7 @@ class SystemActions:
     def get_weather(text="", slots=None):
         cfg = _load_config()
         api_key = cfg.get("api_keys", {}).get("weather", "")
-        default_city = cfg.get("city", "Москва")
+        default_city = cfg.get("city") or cfg.get("weather_city", "Москва")
 
         if not api_key:
             return "Укажи ключ погоды в настройках"
@@ -864,32 +881,48 @@ class SystemActions:
             "ростов": "Ростов-на-Дону"
         }
 
+        # Мусорные слова и псевдо-локации
+        weather_junk = {
+            "улица", "улице", "улицы", "улицу", "на улице", "двор", "дворе", "двора", "во дворе",
+            "окно", "окном", "за окном", "снаружи", "тут", "здесь", "дома", "доме",
+            "город", "городе", "сейчас", "сегодня", "завтра", "неделю", "неделе",
+            "неделя", "выходные", "выходных", "градус", "градусов", "градуса",
+            "погода", "погоду", "погоде", "температура", "температуру", "небо", "небе"
+        }
+
         city_raw = None
         if slots and "city" in slots:
-            city_raw = slots["city"]
+            cand = slots["city"].strip().lower()
+            if cand not in weather_junk:
+                city_raw = slots["city"].strip()
 
         if not city_raw and text:
             text_clean = text.lower()
-            match = re.search(r'\b(?:в|во|на)\s+([а-яа-яa-z\s-]+)', text_clean)
+            match = re.search(r'\b(?:в|во|на)\s+([а-яёa-z\s-]+)', text_clean)
             if match:
                 possible_city = match.group(1).strip()
-                junk = ["сейчас", "сегодня", "завтра", "на неделю", "пожалуйста", "градусов", "погода", "погоду",
-                        "астра", "скажи"]
-                for j in junk:
+                junk_patterns = [
+                    "сейчас", "сегодня", "завтра", "на неделю", "пожалуйста", "градусов",
+                    "погода", "погоду", "астра", "скажи", "улице", "улица", "дворе",
+                    "воля", "воле", "на воле", "свободе", "свобода"
+                ]
+                for j in junk_patterns:
                     possible_city = re.sub(r'\b' + j + r'\b', '', possible_city).strip()
-                if possible_city:
+
+                if possible_city and possible_city not in weather_junk:
                     city_raw = possible_city
             else:
                 stop_words = [
                     "какая", "какой", "погода", "погоду", "погоде", "сейчас",
                     "сегодня", "завтра", "город", "городе", "температура",
-                    "градусов", "астра", "скажи", "покажи", "узнай"
+                    "градусов", "астра", "скажи", "покажи", "узнай", "улица", "улице"
                 ]
-                words = [w for w in re.findall(r'\w+', text_clean) if w not in stop_words]
+                words = [w for w in re.findall(r'[а-яёa-z]+', text_clean) if
+                         w not in stop_words and w not in weather_junk]
                 if words:
                     city_raw = words[-1]
 
-        if not city_raw:
+        if not city_raw or city_raw.lower().strip() in weather_junk:
             city_raw = default_city
 
         city_key = city_raw.lower().strip()

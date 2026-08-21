@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 from PIL import ImageGrab
 import pyautogui
+import winreg
+import shutil
 
 pyautogui.FAILSAFE = False
 
@@ -17,6 +19,7 @@ class GuiAdapter:
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.templates_dir = os.path.join(self.base_dir, "templates")
         self._cached_sota_target = None
+        self._cached_happ_target = None
 
     def _get_system_scale(self) -> int:
         try:
@@ -48,6 +51,7 @@ class GuiAdapter:
     def _collect_template_paths(self, app_name: str, subfolder: str = "") -> list:
         scale_folder = self._get_closest_scale_folder()
         app_dir = os.path.join(self.templates_dir, scale_folder, app_name)
+
         if subfolder:
             app_dir = os.path.join(app_dir, subfolder)
 
@@ -62,7 +66,7 @@ class GuiAdapter:
 
         return template_paths
 
-    def _find_best_match(self, template_paths: list, hwnd: int = 0, threshold: float = 0.65):
+    def _find_best_match(self, template_paths: list, hwnd: int = 0, threshold: float = 0.78, bottom_only: bool = False):
         if not template_paths:
             return None
 
@@ -77,9 +81,15 @@ class GuiAdapter:
             h = rect.bottom - rect.top
             if w > 100 and h > 100:
                 try:
-                    bbox = (rect.left, rect.top, rect.right, rect.bottom)
+                    if bottom_only:
+                        top_bound = rect.bottom - int(h * 0.28)
+                        bbox = (rect.left, top_bound, rect.right, rect.bottom)
+                        offset_x, offset_y = rect.left, top_bound
+                    else:
+                        bbox = (rect.left, rect.top, rect.right, rect.bottom)
+                        offset_x, offset_y = rect.left, rect.top
+
                     screen = np.array(ImageGrab.grab(bbox=bbox))
-                    offset_x, offset_y = rect.left, rect.top
                     grab_success = True
                 except Exception:
                     grab_success = False
@@ -114,28 +124,27 @@ class GuiAdapter:
 
         return None
 
-    def click_app_toggle(self, app_name: str, hwnd: int = 0, retries: int = 10, delay: float = 0.15) -> bool:
+    def _safe_click(self, x, y):
+        """Безопасный клик с задержкой, чтобы избежать ложных двойных кликов во Flutter"""
+        pyautogui.mouseDown(x, y)
+        time.sleep(0.08)
+        pyautogui.mouseUp(x, y)
+
+    def click_app_toggle(self, app_name: str, hwnd: int = 0, retries: int = 8, delay: float = 0.15,
+                         threshold: float = 0.78, bottom_only: bool = False) -> bool:
         template_paths = self._collect_template_paths(app_name)
         if not template_paths:
             return False
 
         for _ in range(retries):
-            coords = self._find_best_match(template_paths, hwnd=hwnd)
+            coords = self._find_best_match(template_paths, hwnd=hwnd, threshold=threshold, bottom_only=bottom_only)
             if coords:
-                pyautogui.click(coords[0], coords[1])
+                self._safe_click(coords[0], coords[1])
                 time.sleep(0.2)
                 return True
             time.sleep(delay)
 
         return False
-
-    def handle_conflict_popups(self, app_name: str, hwnd: int = 0):
-        conflict_templates = self._collect_template_paths(app_name, subfolder="conflicts")
-        if conflict_templates:
-            coords = self._find_best_match(conflict_templates, hwnd=hwnd, threshold=0.70)
-            if coords:
-                pyautogui.click(coords[0], coords[1])
-                time.sleep(0.3)
 
     def _get_window_hwnd(self, title_keywords: list, process_names: list = None) -> int:
         candidates = []
@@ -203,17 +212,62 @@ class GuiAdapter:
             time.sleep(0.2)
             ctypes.windll.user32.ShowWindow(hwnd, 6)
 
-    def _find_sota_target(self) -> str:
-        if self._cached_sota_target and os.path.exists(self._cached_sota_target):
-            return self._cached_sota_target
+    def _get_path_from_uninstall_registry(self, target_name: str) -> str:
+        paths = [
+            (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (winreg.HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall")
+        ]
+        for hkey, path in paths:
+            try:
+                with winreg.OpenKey(hkey, path) as key:
+                    for i in range(winreg.QueryInfoKey(key)[0]):
+                        try:
+                            subkey_name = winreg.EnumKey(key, i)
+                            with winreg.OpenKey(key, subkey_name) as subkey:
+                                display_name, _ = winreg.QueryValueEx(subkey, "DisplayName")
+                                if target_name.lower() in display_name.lower():
+                                    try:
+                                        install_loc, _ = winreg.QueryValueEx(subkey, "InstallLocation")
+                                        if install_loc:
+                                            exe_path = os.path.join(install_loc, f"{target_name}.exe")
+                                            if os.path.exists(exe_path):
+                                                return exe_path
+                                    except OSError:
+                                        pass
+                                    try:
+                                        display_icon, _ = winreg.QueryValueEx(subkey, "DisplayIcon")
+                                        if display_icon:
+                                            clean_path = display_icon.strip('"').split(',')[0]
+                                            if clean_path.lower().endswith(".exe") and os.path.exists(clean_path):
+                                                return clean_path
+                                    except OSError:
+                                        pass
+                        except OSError:
+                            continue
+            except OSError:
+                continue
+        return ""
 
+    def _get_path_from_protocol_registry(self, protocol_name: str) -> str:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, rf"{protocol_name}\shell\open\command") as key:
+                cmd, _ = winreg.QueryValueEx(key, "")
+                import re
+                match = re.search(r'"([^"]+\.exe)"', cmd, re.IGNORECASE)
+                if match and os.path.exists(match.group(1)):
+                    return match.group(1)
+        except Exception:
+            pass
+        return ""
+
+    def _find_target_executable(self, exact_name: str, name_keywords: list) -> str:
         for proc in psutil.process_iter(['name', 'exe']):
             try:
-                name = (proc.info.get('name') or '').lower()
-                if "sota" in name and not name.startswith("sotad") and "daemon" not in name:
+                p_name = (proc.info.get('name') or '').lower()
+                if p_name == exact_name.lower():
                     exe_path = proc.info.get('exe')
                     if exe_path and os.path.exists(exe_path):
-                        self._cached_sota_target = exe_path
                         return exe_path
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
@@ -224,63 +278,116 @@ class GuiAdapter:
         prog_files_x86 = os.environ.get("PROGRAMFILES(X86)", "")
         user_profile = os.environ.get("USERPROFILE", "")
         public_profile = os.environ.get("PUBLIC", r"C:\Users\Public")
-        program_data = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
 
         shortcut_dirs = [
             os.path.join(user_profile, "Desktop"),
-            os.path.join(public_profile, "Desktop"),
-            os.path.join(appdata, "Microsoft", "Windows", "Start Menu", "Programs"),
-            os.path.join(program_data, "Microsoft", "Windows", "Start Menu", "Programs")
+            os.path.join(public_profile, "Desktop")
         ]
 
         for s_dir in shortcut_dirs:
             if os.path.exists(s_dir):
                 for root, _, files in os.walk(s_dir):
                     for f in files:
-                        if "sota" in f.lower() and f.lower().endswith(".lnk"):
-                            target = os.path.join(root, f)
-                            self._cached_sota_target = target
-                            return target
+                        f_low = f.lower()
+                        if any(kw in f_low for kw in name_keywords) and f_low.endswith(".lnk"):
+                            return os.path.join(root, f)
 
-        search_roots = [appdata, localappdata, prog_files, prog_files_x86]
+        search_roots = [
+            os.path.join(localappdata, "Programs"),
+            localappdata,
+            appdata,
+            prog_files,
+            prog_files_x86
+        ]
+
         for s_root in search_roots:
             if not s_root or not os.path.exists(s_root):
                 continue
             try:
-                for entry in os.listdir(s_root):
-                    entry_low = entry.lower()
-                    if "sota" in entry_low or "interhive" in entry_low:
-                        full_entry_dir = os.path.join(s_root, entry)
-                        if os.path.isdir(full_entry_dir):
-                            for root, _, files in os.walk(full_entry_dir):
-                                for f in files:
-                                    fl = f.lower()
-                                    if fl.endswith(".exe") and not fl.startswith("sotad") and "daemon" not in fl and "sing-box" not in fl and "xray" not in fl and "tun2socks" not in fl and "unins" not in fl:
-                                        target = os.path.join(root, f)
-                                        self._cached_sota_target = target
-                                        return target
+                entries = os.listdir(s_root)
             except Exception:
                 continue
 
+            for entry in entries:
+                entry_low = entry.lower()
+                if any(kw in entry_low for kw in name_keywords):
+                    full_entry_dir = os.path.join(s_root, entry)
+                    if os.path.isdir(full_entry_dir):
+                        try:
+                            for root, _, files in os.walk(full_entry_dir):
+                                for f in files:
+                                    if f.lower() == exact_name.lower():
+                                        return os.path.join(root, f)
+                        except Exception:
+                            pass
+
         return ""
 
+    def _find_sota_target(self) -> str:
+        if self._cached_sota_target and os.path.exists(self._cached_sota_target):
+            return self._cached_sota_target
+
+        reg_path = self._get_path_from_uninstall_registry("Sota") or self._get_path_from_protocol_registry("sota")
+        if reg_path:
+            self._cached_sota_target = reg_path
+            return reg_path
+
+        target = self._find_target_executable("sota connect.exe", ["sota", "interhive"])
+        if not target:
+            target = self._find_target_executable("sota.exe", ["sota", "interhive"])
+
+        if not target:
+            target = shutil.which("sota connect.exe") or shutil.which("sota.exe")
+
+        if target:
+            self._cached_sota_target = target
+        return target or ""
+
+    def _find_happ_target(self) -> str:
+        if self._cached_happ_target and os.path.exists(self._cached_happ_target):
+            return self._cached_happ_target
+
+        reg_path = self._get_path_from_uninstall_registry("Happ") or self._get_path_from_protocol_registry("happ")
+        if reg_path:
+            self._cached_happ_target = reg_path
+            return reg_path
+
+        target = self._find_target_executable("happ.exe", ["happ", "хапп"])
+
+        if not target:
+            target = shutil.which("happ.exe")
+
+        if target:
+            self._cached_happ_target = target
+        return target or ""
+
     def _launch_target(self, target_path: str):
-        if target_path.lower().endswith(".lnk"):
+        try:
             os.startfile(target_path)
-        else:
-            subprocess.Popen(f'"{target_path}"', shell=True)
+        except Exception:
+            work_dir = os.path.dirname(target_path)
+            subprocess.Popen(f'"{target_path}"', cwd=work_dir, shell=True)
+
+    def connect_sota(self):
+        return self.toggle_sota()
+
+    def disconnect_sota(self):
+        return self.toggle_sota()
 
     def toggle_sota(self):
         try:
-            hwnd = self._get_window_hwnd(["Sota Connect", "Sota"], ["sota connect.exe", "sotaconnect.exe", "sota.exe", "sotaconnectclient.exe"])
+            hwnd = self._get_window_hwnd(["Sota Connect", "Sota"],
+                                         ["sota connect.exe", "sotaconnect.exe", "sota.exe", "sotaconnectclient.exe"])
 
             if not hwnd:
                 target_path = self._find_sota_target()
                 if target_path:
                     self._launch_target(target_path)
-                    for _ in range(12):
-                        time.sleep(0.2)
-                        hwnd = self._get_window_hwnd(["Sota Connect", "Sota"], ["sota connect.exe", "sotaconnect.exe", "sota.exe", "sotaconnectclient.exe"])
+                    for _ in range(15):
+                        time.sleep(0.25)
+                        hwnd = self._get_window_hwnd(["Sota Connect", "Sota"],
+                                                     ["sota connect.exe", "sotaconnect.exe", "sota.exe",
+                                                      "sotaconnectclient.exe"])
                         if hwnd:
                             break
                 else:
@@ -288,7 +395,7 @@ class GuiAdapter:
 
             self._show_and_focus(hwnd)
 
-            if self.click_app_toggle("sota_connect", hwnd=hwnd):
+            if self.click_app_toggle("sota_connect", hwnd=hwnd, threshold=0.72):
                 self._minimize(hwnd)
                 return "Сделала!"
 
@@ -296,25 +403,63 @@ class GuiAdapter:
         except Exception as e:
             return f"Не удалось запустить Соту: {e}"
 
-    def toggle_happ(self):
+    def connect_happ(self):
+        return self._set_happ_state(target_state=True)
+
+    def disconnect_happ(self):
+        return self._set_happ_state(target_state=False)
+
+    def _set_happ_state(self, target_state: bool):
         try:
+            target_path = self._find_happ_target()
+            if not target_path:
+                return "Не удалось найти приложение Happ.exe."
+
             hwnd = self._get_window_hwnd(["Happ"], ["happ.exe"])
+            was_launched = False
+
+            if not hwnd or not ctypes.windll.user32.IsWindowVisible(hwnd):
+                self._launch_target(target_path)
+                was_launched = True
+
+            for _ in range(25):
+                time.sleep(0.3)
+                hwnd = self._get_window_hwnd(["Happ"], ["happ.exe"])
+                if hwnd and ctypes.windll.user32.IsWindowVisible(hwnd):
+                    break
 
             if not hwnd:
-                subprocess.Popen(["cmd", "/c", "start", "happ:"], shell=True)
-                for _ in range(12):
-                    time.sleep(0.2)
-                    hwnd = self._get_window_hwnd(["Happ"], ["happ.exe"])
-                    if hwnd:
-                        break
+                return "Не удалось дождаться открытия окна Хапп"
 
             self._show_and_focus(hwnd)
-            self.handle_conflict_popups("happ", hwnd=hwnd)
+            time.sleep(1.2 if was_launched else 0.4)
 
-            if self.click_app_toggle("happ", hwnd=hwnd):
-                self._minimize(hwnd)
-                return "Сделала!"
+            desired_folder = "disabled" if target_state else "active"
+            opposite_folder = "active" if target_state else "disabled"
 
-            return "Открыла Хапп"
+            # Защита от альцгеймера екарный бабай
+            opposite_templates = self._collect_template_paths("happ", subfolder=opposite_folder)
+            if opposite_templates:
+                if self._find_best_match(opposite_templates, hwnd=hwnd, threshold=0.75):
+                    self._minimize(hwnd)
+                    return "Хапп уже " + ("включен!" if target_state else "выключен!")
+
+            desired_templates = self._collect_template_paths("happ", subfolder=desired_folder)
+
+            if not desired_templates:
+                desired_templates = self._collect_template_paths("happ")
+
+            for _ in range(8):
+                coords = self._find_best_match(desired_templates, hwnd=hwnd, threshold=0.75)
+                if coords:
+                    self._safe_click(coords[0], coords[1])
+                    time.sleep(0.3)
+                    self._minimize(hwnd)
+                    return "Включила Хапп!" if target_state else "Выключила Хапп!"
+                time.sleep(0.25)
+
+            self._minimize(hwnd)
+            return "Открыла Хапп, но не смогла распознать нужную кнопку"
+
         except Exception as e:
-            return f"Не удалось запустить Хапп: {e}"
+            return f"Не удалось управлять Хапп: {e}"

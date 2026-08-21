@@ -14,7 +14,6 @@ from core.nlp.llm_provider import GigaChatProvider
 from core.nlp.nlu import JointNLU
 from core.nlp.emotion_classifier import EmotionClassifier, EMOTION_TRANSLATION
 from core.nlp.document_parser import DocumentParser
-from services.telegram.user_client import TelegramUserManager
 
 tf_logging.set_verbosity_error()
 
@@ -63,7 +62,10 @@ class CommandParser:
             "mode_work": "mode_work",
             "mode_rest": "mode_rest",
             "start_vpn": "start_vpn",
-            "stop_vpn": "stop_vpn"
+            "stop_vpn": "stop_vpn",
+            "smart_home_on": "smart_home_on",
+            "smart_home_off": "smart_home_off",
+            "smart_home_brightness": "smart_home_brightness"
         }
 
         self.nlu = None
@@ -71,10 +73,6 @@ class CommandParser:
 
         self.loader_thread = threading.Thread(target=self._load_model, daemon=True)
         self.loader_thread.start()
-
-        self.tg_user_mgr = TelegramUserManager()
-        self.waiting_for_tg_msg = False
-        self.tg_recipient = None
 
     def _load_model(self):
         try:
@@ -174,6 +172,24 @@ class CommandParser:
         for msp in media_stop_phrases:
             if msp in text_low:
                 return "stop_music"
+
+        brightness_words = ["яркость", "яркости", "процентов яркости"]
+        if any(bw in text_low for bw in brightness_words):
+            if any(w in text_low for w in ["свет", "ламп", "люстр", "подсветк", "диод", "ночник", "комнат"]):
+                return "smart_home_brightness"
+
+        sh_on_verbs = ["включи", "зажги", "подруби", "вруби", "запусти"]
+        sh_off_verbs = ["выключи", "потуши", "погаси", "отруби", "выруби"]
+        sh_targets = ["свет", "люстру", "лампу", "бра", "ночник", "подсветку", "розетку", "гирлянду", "света", "свете",
+                      "розетки"]
+
+        if any(verb in text_low for verb in sh_on_verbs):
+            if any(target in text_low for target in sh_targets):
+                return "smart_home_on"
+
+        if any(verb in text_low for verb in sh_off_verbs):
+            if any(target in text_low for target in sh_targets):
+                return "smart_home_off"
 
         fullscreen_keywords = [
             "разверни", "на весь экран", "во весь экран", "полный экран",
@@ -317,47 +333,6 @@ class CommandParser:
             else:
                 msg = "Не удалось распознать текст в этом файле."
                 return {"chat": msg, "voice": msg, "emotion": emotion}
-
-        if self.waiting_for_tg_msg:
-            if any(w in text_low for w in ["отмена", "забудь", "не надо", "хватит", "стоп"]):
-                self.waiting_for_tg_msg = False
-                self.tg_recipient = None
-                return {
-                    "chat": "Отправка сообщения отменена.",
-                    "voice": "Отменила отправку.",
-                    "emotion": emotion
-                }
-
-            msg_to_send = text
-            target = self.tg_recipient
-            self.waiting_for_tg_msg = False
-            self.tg_recipient = None
-
-            success, info = self.tg_user_mgr.send_message_sync(target, msg_to_send)
-            if success:
-                return {
-                    "chat": f"Сообщение для {target.title()} отправлено: «{msg_to_send}»",
-                    "voice": "Отправила!",
-                    "emotion": emotion
-                }
-            else:
-                return {
-                    "chat": f"Не удалось отправить: {info}",
-                    "voice": "Не смогла отправить сообщение.",
-                    "emotion": emotion
-                }
-
-        tg_match = re.search(
-            r'\b(?:отправь сообщение|напиши сообщение|напиши|отправь)\s+(?:контакту\s+)?([а-яa-z0-9_@]+)', text_low)
-        if tg_match and not any(w in text_low for w in ["музык", "трек", "видео", "обход", "запрет", "пк", "комп"]):
-            target_name = tg_match.group(1).strip()
-            self.waiting_for_tg_msg = True
-            self.tg_recipient = target_name
-            return {
-                "chat": f"Кому: {target_name.title()}. Что отправить?",
-                "voice": "Что отправить?",
-                "emotion": emotion
-            }
 
         if self.waiting_for_zapret:
             num = self._extract_zapret_number(text_low)

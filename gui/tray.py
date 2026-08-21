@@ -1,9 +1,12 @@
-from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QStyle
-from PyQt6.QtGui import QAction
+import os
+from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
+from PyQt6.QtGui import QAction, QIcon
+
 
 class SystemTray(QSystemTrayIcon):
     def __init__(self, window, app):
-        icon = app.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon)
+        icon_path = os.path.join("assets", "icon", "ico", "icon_round.ico")
+        icon = QIcon(icon_path) if os.path.exists(icon_path) else app.windowIcon()
         super().__init__(icon, parent=window)
         self.window = window
         self.app = app

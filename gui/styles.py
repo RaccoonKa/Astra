@@ -271,4 +271,15 @@ QPushButton#GuideCloseBtn {
 QPushButton#GuideCloseBtn:hover {
     background: #ffffff;
 }
+QPushButton#ExitBtn {
+    background-color: transparent;
+    color: #ffffff;
+    font-size: 16px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+QPushButton#ExitBtn:hover {
+    background-color: rgba(92, 78, 26, 0.2);
+    color: #ffd700;
+}
 """

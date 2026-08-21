@@ -739,6 +739,12 @@ class MainWindow(QWidget):
         title_btns_layout.setContentsMargins(0, 0, 0, 0)
         title_btns_layout.setSpacing(0)
 
+        self.exit_btn = QPushButton("⏻")
+        self.exit_btn.setObjectName("ExitBtn")
+        self.exit_btn.setFixedWidth(30)
+        self.exit_btn.clicked.connect(self.exit_app)
+        title_btns_layout.addWidget(self.exit_btn)
+
         self.settings_btn = QPushButton("⚙")
         self.settings_btn.setObjectName("TitleBtn")
         self.settings_btn.setFixedWidth(30)
@@ -852,8 +858,14 @@ class MainWindow(QWidget):
         self.speak_reply(msg)
 
     def set_ui_interactive(self, enabled: bool):
+        self.exit_btn.setEnabled(enabled)
         self.settings_btn.setEnabled(enabled)
         self.toggle_chat_btn.setEnabled(enabled)
+
+    def exit_app(self):
+        self.shutdown()
+        from PyQt6.QtWidgets import QApplication
+        QApplication.instance().quit()
 
     def init_audio(self):
         self.stt_thread = STTThread(model_path="optimized_models/model_vosk", parent=self)
@@ -1205,51 +1217,3 @@ class MainWindow(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_position = QPoint()
             event.accept()
-
-    def send_message(self):
-        if not self.ui_revealed:
-            return
-
-        text = self.input_field.text().strip()
-        attached_file = self.right_panel.attached_file
-
-        if text or attached_file:
-            user_msg = text if text else "Изучи прикрепленный файл"
-
-            if attached_file:
-                filename = os.path.basename(attached_file)
-                self.chat_history.append(f"Вы: {user_msg} [📎 {filename}]")
-            else:
-                self.chat_history.append(f"Вы: {user_msg}")
-
-            self.input_field.clear()
-            self.input_field.setEnabled(False)
-            self.send_button.setEnabled(False)
-            self.right_panel.clear_attachment()
-
-            self.text_worker = CommandWorker(
-                self.command_parser,
-                text,
-                is_voice=False,
-                attached_file=attached_file,
-                parent=self
-            )
-            self.text_worker.result_ready.connect(self.on_text_command_finished)
-            self.text_worker.start()
-
-    def on_text_command_finished(self, response):
-        self.input_field.setEnabled(True)
-        self.send_button.setEnabled(True)
-        self.input_field.setFocus()
-
-        if response:
-            if isinstance(response, dict):
-                chat_text = response.get("chat", "") or response.get("voice", "")
-                voice_text = response.get("voice", "")
-            else:
-                chat_text = voice_text = str(response)
-
-            if chat_text:
-                self.chat_history.append(f"Астра: {chat_text}\n")
-            if voice_text:
-                self.speak_reply(voice_text)

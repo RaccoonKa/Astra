@@ -96,11 +96,11 @@ class VpnManager:
         target = specific_vpn or self.get_configured_vpn()
 
         if target == "sota":
-            res = self.gui.toggle_sota()
+            res = self.gui.connect_sota()
             self.last_active_vpn = "sota"
             return res
         elif target == "happ":
-            res = self.gui.toggle_happ()
+            res = self.gui.connect_happ()
             self.last_active_vpn = "happ"
             return res
         elif target == "v2ray":
@@ -118,11 +118,11 @@ class VpnManager:
         target = specific_vpn or self.last_active_vpn or self.get_configured_vpn()
 
         if target == "sota":
-            res = self.gui.toggle_sota()
+            res = self.gui.disconnect_sota()
             self.last_active_vpn = None
             return res
         elif target == "happ":
-            res = self.gui.toggle_happ()
+            res = self.gui.disconnect_happ()
             self.last_active_vpn = None
             return res
         elif target == "v2ray":
