@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/GUI-PyQt6-gold?style=flat-square&logo=qt" alt="PyQt6"/>
   <img src="https://img.shields.io/badge/Inference-ONNX%20Runtime-orange?style=flat-square" alt="ONNX Runtime"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows" alt="Platform"/>
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"/>
+  <a href="https://creativecommons.org/licenses/by-nc/4.0/"><img src="https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey?style=flat-square" alt="License: CC BY-NC 4.0"/></a>
 </p>
 
 ---
@@ -109,3 +109,8 @@ flowchart TD
 
 * **Офлайн-обработка зрения:** Модули распознавания лица, усталости глаз и жестов работают исключительно на локальном ПК пользователя. Видеопоток с веб-камеры никогда не передаётся во внешние облачные сервисы.
 * **Локальное хранение конфигураций:** Все ключи API, токены и шаблоны лиц (`owner_face`) хранятся локально в директории `personal_data/` в зашифрованном или изолированном виде.
+
+---
+
+## 📄 Лицензия
+Проект распространяется под лицензией [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Разрешено некоммерческое использование, изучение и модификация с обязательным указанием авторства.
