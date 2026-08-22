@@ -14,7 +14,7 @@ from PyQt6.QtGui import (
     QBrush, QPainterPath, QFont, QFontDatabase
 )
 
-from personal_data.configs.config import save_config, load_config
+from core.utils.config import save_config, load_config
 from gui.settings_window import ModernToggle, NoScrollComboBox
 
 WIZARD_STYLE = """

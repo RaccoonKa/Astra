@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import re
 
 
 class SmartHomeManager:
@@ -56,53 +57,97 @@ class SmartHomeManager:
         except Exception as e:
             return False, f"Не удалось связаться с умным домом: {e}"
 
-    def _find_matching_devices(self, query):
+    def _get_stem(self, word: str) -> str:
+        word = word.lower().replace("ё", "е")
+        return re.sub(r'(а|я|о|е|ы|и|у|ю|ой|ей|ом|ем|ам|ям|ах|ях|ую|юю|ов|ев|ие|ый|ая|ое|ка|ки|ку|ке|кой)$', '', word)
+
+    def _find_matching_devices(self, query: str):
         if not self.devices_cache:
             self.update_cache()
 
-        query_clean = query.lower().strip()
-        matched = []
+        query_clean = query.lower().replace("ё", "е").strip()
+        all_words = [self._get_stem(w) for w in re.findall(r'[а-яa-z0-9]+', query_clean) if len(w) > 2]
 
-        is_light_query = any(w in query_clean for w in ["свет", "люстр", "ламп", "бра", "ночник", "подсветк", "диод"])
-        is_socket_query = any(w in query_clean for w in ["розетк", "чайник", "обогреват", "удлинител", "питани"])
+        target_room_id = None
+        target_room_name = ""
+        for r_id, r_name in self.rooms_cache.items():
+            r_stem = self._get_stem(r_name)
+            if any(r_stem in qw or qw in r_stem for qw in all_words):
+                target_room_id = r_id
+                target_room_name = r_name
+                break
 
-        for dev in self.devices_cache:
-            dev_name = dev.get("name", "").lower()
+        room_stems = [self._get_stem(target_room_name)] if target_room_name else []
+        ignored_stems = {"включ", "выключ", "погас", "потуш", "зажг", "вруб", "отруб", "запуст", "астр", "пожалуйст"} | set(room_stems)
+
+        device_stems = [w for w in all_words if w not in ignored_stems]
+
+        is_generic_light = any(w in query_clean for w in ["свет", "все", "всё", "везде", "освещен"])
+        is_lamp_specific = any(w in query_clean for w in ["ламп", "люстр", "бра", "ночник"])
+        is_strip_specific = any(w in query_clean for w in ["лент", "подсветк", "диод"])
+        is_garland_specific = any(w in query_clean for w in ["гирлянд", "елк", "елка"])
+        is_socket_specific = any(w in query_clean for w in ["розетк", "чайник", "обогреват", "пол", "подогрев"])
+        is_humidifier_specific = any(w in query_clean for w in ["увлажнител", "пар", "влажност"])
+
+        devices_pool = self.devices_cache
+        if target_room_id:
+            devices_pool = [d for d in self.devices_cache if d.get("room") == target_room_id]
+
+        specific_matches = []
+        for dev in devices_pool:
+            dev_name_clean = dev.get("name", "").lower().replace("ё", "е")
             dev_type = dev.get("type", "").lower()
-            room_name = self.rooms_cache.get(dev.get("room"), "")
+            dev_name_stems = [self._get_stem(w) for w in re.findall(r'[а-яa-z0-9]+', dev_name_clean) if len(w) > 2]
 
-            if query_clean in dev_name or dev_name in query_clean:
-                matched.append(dev)
+            name_direct_match = any(ds in dev_name_stems or any(ds in dns for dns in dev_name_stems) for ds in device_stems if ds not in {"свет", "все", "всё"})
+
+            if name_direct_match:
+                specific_matches.append(dev)
                 continue
 
-            if room_name and room_name in query_clean:
-                if is_light_query and ("light" in dev_type or "lamp" in dev_type):
-                    matched.append(dev)
-                elif is_socket_query and ("socket" in dev_type or "switch" in dev_type):
-                    matched.append(dev)
-                elif not is_light_query and not is_socket_query:
-                    matched.append(dev)
-                continue
+            if is_lamp_specific and ("lamp" in dev_name_clean or "люстр" in dev_name_clean or "бра" in dev_name_clean) and "strip" not in dev_type:
+                specific_matches.append(dev)
+            elif is_strip_specific and ("strip" in dev_type or "лент" in dev_name_clean or "подсветк" in dev_name_clean):
+                specific_matches.append(dev)
+            elif is_garland_specific and ("гирлянд" in dev_name_clean or "елк" in dev_name_clean):
+                specific_matches.append(dev)
+            elif is_socket_specific and ("socket" in dev_type or "switch" in dev_type or "пол" in dev_name_clean):
+                specific_matches.append(dev)
+            elif is_humidifier_specific and ("humidifier" in dev_type or "увлажнител" in dev_name_clean):
+                specific_matches.append(dev)
 
-            if is_light_query and ("light" in dev_type or "lamp" in dev_type):
-                if not any(r in query_clean for r in self.rooms_cache.values()):
-                    matched.append(dev)
-            elif is_socket_query and ("socket" in dev_type or "switch" in dev_type):
-                if not any(r in query_clean for r in self.rooms_cache.values()):
-                    matched.append(dev)
+        if specific_matches:
+            return specific_matches
 
-        return matched
+        if target_room_id and is_generic_light:
+            return [d for d in devices_pool if "light" in d.get("type", "").lower() or "lamp" in d.get("type", "").lower()]
 
-    def _find_scenario(self, query):
+        if not target_room_id and is_generic_light:
+            return [d for d in self.devices_cache if "light" in d.get("type", "").lower() or "lamp" in d.get("type", "").lower()]
+
+        return []
+
+    def _find_scenario(self, query: str):
         if not self.scenarios_cache:
             self.update_cache()
 
-        query_clean = query.lower().strip()
+        query_clean = query.lower().replace("ё", "е").strip()
+        query_stems = [self._get_stem(w) for w in re.findall(r'[а-яa-z0-9]+', query_clean) if len(w) > 2]
+
         for sc in self.scenarios_cache:
-            name = sc.get("name", "").lower()
-            if name in query_clean or query_clean in name:
+            sc_name_clean = sc.get("name", "").lower().replace("ё", "е")
+            sc_stems = [self._get_stem(w) for w in re.findall(r'[а-яa-z0-9]+', sc_name_clean) if len(w) > 2]
+            if sc_name_clean in query_clean or query_clean in sc_name_clean:
+                return sc
+            if any(qs in ss or ss in qs for qs in query_stems for ss in sc_stems):
                 return sc
         return None
+
+    def execute_scenario_by_name(self, scenario_query: str):
+        scenario = self._find_scenario(scenario_query)
+        if scenario:
+            return self.execute_scenario(scenario["id"], scenario["name"])
+        return "Такой сценарий не найден в Умном Доме"
 
     def turn_on(self, target_query=""):
         headers = self._get_headers()

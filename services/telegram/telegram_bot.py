@@ -23,7 +23,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from personal_data.configs.config import load_config, save_config
+from core.utils.config import load_config, save_config
 from core.nlp.command_parser import CommandParser
 from core.nlp.asr_corrector import ASRCorrector
 

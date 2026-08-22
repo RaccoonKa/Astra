@@ -1,13 +1,23 @@
 import os
 from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction, QIcon, QPixmap
 
 
 class SystemTray(QSystemTrayIcon):
     def __init__(self, window, app):
-        icon_path = os.path.join("assets", "icon", "ico", "icon_round.ico")
-        icon = QIcon(icon_path) if os.path.exists(icon_path) else app.windowIcon()
-        super().__init__(icon, parent=window)
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ico_path = os.path.join(base_dir, "assets", "icon", "ico", "icon_round.ico")
+        png_path = os.path.join(base_dir, "assets", "icon", "icon_round.png")
+
+        tray_icon = QIcon()
+        if os.path.exists(ico_path):
+            tray_icon.addFile(ico_path)
+        elif os.path.exists(png_path):
+            tray_icon.addPixmap(QPixmap(png_path))
+        else:
+            tray_icon = app.windowIcon()
+
+        super().__init__(tray_icon, parent=window)
         self.window = window
         self.app = app
         self.setToolTip("Астра")

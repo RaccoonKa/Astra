@@ -3,17 +3,21 @@ import json
 import queue
 import sounddevice as sd
 import vosk
+from core.nlp.asr_corrector import ASRCorrector
 
 
 class SpeechListener:
     def __init__(self, device_id=None):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        config_path = os.path.join(base_dir, "config.template.json")
-        assistant_name = "Aстра"
-        if os.path.exists(config_path):
+        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
+        template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
+        target_path = config_path if os.path.exists(config_path) else template_path
+
+        assistant_name = "астра"
+        if os.path.exists(target_path):
             try:
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(target_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
                     assistant_name = cfg.get("assistant_name", "астра").lower()
             except Exception:
@@ -34,10 +38,9 @@ class SpeechListener:
         self.samplerate = 16000
         self.audio_queue = queue.Queue()
         self.device_id = device_id
+        self.corrector = ASRCorrector()
 
-    def _audio_callback(self, indata, frames, time, status):
-        if status:
-            print(f"[AUDIO WARNING]: {status}", flush=True)
+    def _audio_callback(self, indata, frames, time_info, status):
         self.audio_queue.put(bytes(indata))
 
     def _contains_wake_word(self, text):
@@ -61,13 +64,13 @@ class SpeechListener:
 
         with sd.RawInputStream(
                 samplerate=self.samplerate,
-                blocksize=8000,
+                blocksize=4000,
                 device=self.device_id,
                 dtype="int16",
                 channels=1,
                 callback=self._audio_callback
         ):
-            print(f"[INFO]: Слушатель запущен! Произнеси 'Астра'...")
+            print("[INFO]: Vosk запущен! Произнеси 'Астра'...")
 
             active_mode = False
 
@@ -87,8 +90,9 @@ class SpeechListener:
 
                     if has_wake:
                         words = text.split()
-                        command = " ".join(words[wake_idx + 1:]).strip()
-                        if command:
+                        raw_command = " ".join(words[wake_idx + 1:]).strip()
+                        if raw_command:
+                            command = self.corrector.correct(raw_command)
                             print(f"[КОМАНДА]: {command}")
                             on_command_detected(command)
                             active_mode = False
@@ -96,8 +100,9 @@ class SpeechListener:
                             print("[АКТИВАЦИЯ]: Услышала имя! Слушаю команду...")
                             active_mode = True
                     elif active_mode:
-                        print(f"[КОМАНДА В АКТИВНОМ РЕЖИМЕ]: {text}")
-                        on_command_detected(text)
+                        command = self.corrector.correct(text)
+                        print(f"[КОМАНДА В АКТИВНОМ РЕЖИМЕ]: {command}")
+                        on_command_detected(command)
                         active_mode = False
 
 
@@ -106,11 +111,9 @@ if __name__ == "__main__":
 
     parser = CommandParser()
 
-
     def handle_command(text):
         response = parser.process_command(text)
         print(f"[ОТВЕТ АСТРЫ]: {response}\n")
-
 
     listener = SpeechListener()
     listener.listen_loop(handle_command)

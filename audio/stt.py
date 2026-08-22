@@ -13,9 +13,10 @@ class STTThread(QThread):
     listening_state_changed = pyqtSignal(bool)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, model_path="optimized_models/model_vosk", parent=None):
+    def __init__(self, model_path=None, parent=None):
         super().__init__(parent)
-        self.model_path = model_path
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.model_path = model_path if model_path else os.path.join(base_dir, "optimized_models", "model_vosk")
         self._running = True
         self.samplerate = 16000
         self.audio_queue = queue.Queue()
@@ -23,12 +24,14 @@ class STTThread(QThread):
         self.is_speaking = False
         self.corrector = ASRCorrector()
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        config_path = os.path.join(base_dir, "config.template.json")
+        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
+        template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
+        target_path = config_path if os.path.exists(config_path) else template_path
+
         assistant_name = "астра"
-        if os.path.exists(config_path):
+        if os.path.exists(target_path):
             try:
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(target_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
                     assistant_name = cfg.get("assistant_name", "астра").lower()
             except Exception:
@@ -47,8 +50,6 @@ class STTThread(QThread):
                 self.audio_queue.queue.clear()
 
     def _audio_callback(self, indata, frames, time_info, status):
-        if status:
-            pass
         self.audio_queue.put(bytes(indata))
 
     def _contains_wake_word(self, text):
@@ -73,7 +74,7 @@ class STTThread(QThread):
         try:
             stream = sd.RawInputStream(
                 samplerate=self.samplerate,
-                blocksize=8000,
+                blocksize=4000,
                 dtype="int16",
                 channels=1,
                 callback=self._audio_callback
@@ -105,7 +106,7 @@ class STTThread(QThread):
                     utterance_buffer.clear()
                     self.listening_state_changed.emit(True)
 
-                if active_mode and (time.time() - active_start_time > 4.0):
+                if active_mode and (time.time() - active_start_time > 4.5):
                     active_mode = False
                     utterance_buffer.clear()
                     self.listening_state_changed.emit(False)

@@ -65,7 +65,8 @@ class CommandParser:
             "stop_vpn": "stop_vpn",
             "smart_home_on": "smart_home_on",
             "smart_home_off": "smart_home_off",
-            "smart_home_brightness": "smart_home_brightness"
+            "smart_home_brightness": "smart_home_brightness",
+            "smart_home_scenario": "smart_home_scenario"
         }
 
         self.nlu = None
@@ -182,6 +183,37 @@ class CommandParser:
         sh_off_verbs = ["выключи", "потуши", "погаси", "отруби", "выруби"]
         sh_targets = ["свет", "люстру", "лампу", "бра", "ночник", "подсветку", "розетку", "гирлянду", "света", "свете",
                       "розетки"]
+
+        if any(verb in text_low for verb in sh_on_verbs):
+            if any(target in text_low for target in sh_targets):
+                return "smart_home_on"
+
+        if any(verb in text_low for verb in sh_off_verbs):
+            if any(target in text_low for target in sh_targets):
+                return "smart_home_off"
+        scenario_triggers = [
+            "я ухожу", "ухожу из дома", "сценарий", "режим вечер",
+            "новый год", "свет по движению"
+        ]
+        if any(st in text_low for st in scenario_triggers):
+            return "smart_home_scenario"
+
+        brightness_words = ["яркость", "яркости", "процентов яркости"]
+        if any(bw in text_low for bw in brightness_words):
+            if any(w in text_low for w in ["свет", "ламп", "люстр", "подсветк", "диод", "ночник", "комнат", "лент"]):
+                return "smart_home_brightness"
+
+        sh_on_verbs = ["включи", "зажги", "подруби", "вруби", "запусти", "подними"]
+        sh_off_verbs = ["выключи", "потуши", "погаси", "отруби", "выруби", "заглуши"]
+
+        sh_targets = [
+            "свет", "люстру", "люстра", "люстры", "лампу", "лампа", "лампы", "лампочку", "лампочка",
+            "бра", "ночник", "подсветку", "подсветка", "розетку", "розетка", "розетки",
+            "гирлянду", "гирлянда", "гирлянды", "света", "свете", "ленту", "лента", "ленты",
+            "елку", "ёлку", "елка", "ёлка", "увлажнитель", "увлажнителя", "пол", "полы", "подогрев",
+            "детскую", "детской", "кухню", "кухне", "гостиную", "гостиной", "коридор", "коридоре",
+            "всё", "все", "везде"
+        ]
 
         if any(verb in text_low for verb in sh_on_verbs):
             if any(target in text_low for target in sh_targets):

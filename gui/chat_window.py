@@ -711,7 +711,7 @@ class MainWindow(QWidget):
 
         self.setFont(self.custom_font)
 
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.resize(750, 450)
 
@@ -868,7 +868,7 @@ class MainWindow(QWidget):
         QApplication.instance().quit()
 
     def init_audio(self):
-        self.stt_thread = STTThread(model_path="optimized_models/model_vosk", parent=self)
+        self.stt_thread = STTThread(parent=self)
         self.stt_thread.text_recognized.connect(self.on_speech_recognized)
         self.stt_thread.listening_state_changed.connect(self.left_panel.set_listening)
         self.stt_thread.error_occurred.connect(self.on_stt_error)

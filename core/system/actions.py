@@ -20,7 +20,6 @@ from services.zapret.zapret import ZapretManager
 from services.vpn.vpn_manager import VpnManager
 from services.yandex.smart_home_manager import SmartHomeManager
 
-
 pyautogui.FAILSAFE = False
 
 wiki_manager = WikipediaManager()
@@ -316,6 +315,15 @@ class SystemActions:
     @staticmethod
     def shutdown_pc(text=""):
         text_low = text.lower() if text else ""
+
+        appliances_safety = [
+            "телик", "телевизор", "тв", "tv", "свет", "ламп", "люстр", "розетк", "лент", "гирлянд",
+            "увлажнител", "чайник", "пылесос", "кондиционер", "кондер", "музык", "трек", "песн", "звук",
+            "пол", "подогрев", "плит", "стиралк", "колонку", "станци", "ночник", "бра", "елка", "елку", "ёлк"
+        ]
+        if any(w in text_low for w in appliances_safety):
+            return smart_home_manager.turn_off(text)
+
         os.system("shutdown /s /t 5")
         if "спокойной ночи" in text_low or "доброй ночи" in text_low:
             return "Сладких снов!"
@@ -465,6 +473,10 @@ class SystemActions:
         num = extract_number(text)
         val = num if num is not None else 50
         return smart_home_manager.set_brightness(val, text)
+
+    @staticmethod
+    def smart_home_scenario(text="", slots=None):
+        return smart_home_manager.execute_scenario_by_name(text)
 
     @staticmethod
     def open_spotify():
@@ -881,7 +893,6 @@ class SystemActions:
             "ростов": "Ростов-на-Дону"
         }
 
-        # Мусорные слова и псевдо-локации
         weather_junk = {
             "улица", "улице", "улицы", "улицу", "на улице", "двор", "дворе", "двора", "во дворе",
             "окно", "окном", "за окном", "снаружи", "тут", "здесь", "дома", "доме",
