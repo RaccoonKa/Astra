@@ -5,17 +5,20 @@
            UpgradeCode="4F82C9E4-1B18-4E4D-B5F2-81D6C7892301">
 
     <MajorUpgrade DowngradeErrorMessage="Более новая версия Астры уже установлена на компьютере." />
+
     <MediaTemplate EmbedCab="yes" />
 
+    <!-- Папка установки: C:\Program Files\Astra -->
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Astra" />
     </StandardDirectory>
 
+    <!-- Ярлык в меню Пуск -->
     <StandardDirectory Id="ProgramMenuFolder">
       <Component Id="ApplicationShortcut" Guid="7B91F248-8C65-4C41-8930-5A3E92B1C840">
         <Shortcut Id="ApplicationStartMenuShortcut"
                   Name="Astra"
-                  Description="Голосовой ассистент Астра"
+                  Description="Astra Voice Assistant"
                   Target="[INSTALLFOLDER]Astra.exe"
                   WorkingDirectory="INSTALLFOLDER"
                   Icon="AppIcon.ico" />
@@ -23,6 +26,7 @@
       </Component>
     </StandardDirectory>
 
+    <!-- Ярлык на Рабочем столе -->
     <StandardDirectory Id="DesktopFolder">
       <Component Id="DesktopShortcut" Guid="2C8E1903-82BA-4F71-92D0-3D8F9A0B7C61">
         <Shortcut Id="ApplicationDesktopShortcut"
@@ -35,8 +39,10 @@
       </Component>
     </StandardDirectory>
 
+    <!-- Иконка приложения -->
     <Icon Id="AppIcon.ico" SourceFile="assets\icon\ico\icon_round.ico" />
 
+    <!-- Автоматический сбор всех файлов и подпапок из dist\Astra -->
     <ComponentGroup Id="ProductComponents">
       <Files Include="dist\Astra\**" />
     </ComponentGroup>
