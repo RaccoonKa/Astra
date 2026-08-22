@@ -6,7 +6,7 @@ import winreg
 import shutil
 from PyQt6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QScrollArea, QWidget, QComboBox, QDialog, QTextEdit, QFileDialog
+    QPushButton, QScrollArea, QWidget, QComboBox, QDialog, QTextEdit, QFileDialog, QSlider
 )
 from PyQt6.QtCore import (
     Qt, QTimer, QRectF, QPoint, QPointF, pyqtSignal,
@@ -16,9 +16,11 @@ from PyQt6.QtGui import (
     QPainter, QPen, QColor, QLinearGradient, QBrush, QPainterPath,
     QFont, QFontDatabase
 )
+from core.utils.config import load_config, save_config, get_user_data_path, get_resource_path
 
 SPEECH_HINTS = {
     "autostart": "Включив автозапуск, я буду просыпаться одновременно с твоим компьютером! Тебе даже не придется искать мою иконку — я сразу буду тут, готова помогать.",
+    "voice_volume": "Ползунок регулирует громкость моей речи относительно системного звука!",
     "user_gender": "Выбери свой пол, чтобы я правильно обращалась к тебе и никогда не путала окончания слов!",
     "vpn_service": "Выбери, какую виртуальную сеть ты используешь! Я смогу автоматически запускать и переключать её по голосовой команде.",
     "telegram_pair": "Включив эту функцию, я смогу дистанционно управлять твоим компьютером или просто общаться с тобой прямо в телеграме! Смогу управлять твоей камерой, питанием, статусом компьютера.",
@@ -350,7 +352,7 @@ class SettingsFrame(QFrame):
         self.border_phase = 0.0
         self.saved_vision_state = False
 
-        font_path = os.path.join("assets", "fonts", "Schiffbauer-Regular.otf")
+        font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
         font_id = QFontDatabase.addApplicationFont(font_path)
         if font_id != -1:
             self.font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
@@ -360,9 +362,7 @@ class SettingsFrame(QFrame):
         self.custom_font = QFont(self.font_family, 11)
         self.setFont(self.custom_font)
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-        self.google_creds_path = os.path.join(base_dir, "personal_data", "configs", "google", "credentials.json")
+        self.google_creds_path = get_user_data_path("google", "credentials.json")
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate_border)
@@ -397,10 +397,7 @@ class SettingsFrame(QFrame):
     def _open_telegram_pairing(self):
         try:
             from gui.telegram_pair_dialog import TelegramPairDialog
-            cfg = {}
-            if os.path.exists(self.config_path):
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
+            cfg = load_config()
             bot_username = cfg.get("api_keys", {}).get("telegram_bot_username", "astr0chka_bot")
             dialog = TelegramPairDialog(bot_username, self.font_family, self)
             if dialog.exec():
@@ -516,6 +513,29 @@ class SettingsFrame(QFrame):
 
         row_auto, self.autostart_toggle = self._create_toggle_row("Автозапуск при включении", "autostart")
         layout_sys.addLayout(row_auto)
+
+        row_vol = QHBoxLayout()
+        row_vol.setContentsMargins(4, 2, 4, 2)
+        row_vol.setSpacing(10)
+        self.lbl_vol_title = QLabel("Громкость речи: 100%")
+        self.lbl_vol_title.setObjectName("ToggleLabel")
+        self.lbl_vol_title.setFont(QFont(self.font_family, 11))
+        row_vol.addWidget(self.lbl_vol_title)
+        row_vol.addStretch()
+
+        hint_vol_btn = self._create_hint_button("voice_volume")
+        row_vol.addWidget(hint_vol_btn)
+
+        self.voice_slider = QSlider(Qt.Orientation.Horizontal)
+        self.voice_slider.setObjectName("VoiceSlider")
+        self.voice_slider.setRange(0, 100)
+        self.voice_slider.setValue(100)
+        self.voice_slider.setFixedWidth(130)
+        self.voice_slider.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.voice_slider.valueChanged.connect(self._on_volume_slider_changed)
+        row_vol.addWidget(self.voice_slider)
+
+        layout_sys.addLayout(row_vol)
 
         gender_items = [
             ("Мужской", "male"),
@@ -726,10 +746,13 @@ class SettingsFrame(QFrame):
 
         self.setLayout(main_layout)
 
+    def _on_volume_slider_changed(self, value):
+        self.lbl_vol_title.setText(f"Громкость речи: {value}%")
+
     def _add_owner_face(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Выбери свои фото", "", "Images (*.png *.jpg *.jpeg)")
         if files:
-            face_dir = os.path.join(os.path.dirname(self.config_path), "..", "owner_face")
+            face_dir = os.path.normpath(get_user_data_path("..", "owner_face"))
             os.makedirs(face_dir, exist_ok=True)
             count = 0
             for f in files:
@@ -744,14 +767,13 @@ class SettingsFrame(QFrame):
 
     def _apply_windows_autostart(self, enabled: bool):
         app_name = "AstraAssistant"
-        script_path = os.path.abspath(sys.argv[0])
-        python_exe = sys.executable
-
-        if script_path.endswith(".py"):
+        if getattr(sys, 'frozen', False):
+            exec_cmd = f'"{sys.executable}"'
+        else:
+            script_path = os.path.abspath(sys.argv[0])
+            python_exe = sys.executable
             pythonw = os.path.join(os.path.dirname(python_exe), "pythonw.exe")
             exec_cmd = f'"{pythonw}" "{script_path}"' if os.path.exists(pythonw) else f'"{python_exe}" "{script_path}"'
-        else:
-            exec_cmd = f'"{script_path}"'
 
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         try:
@@ -768,62 +790,61 @@ class SettingsFrame(QFrame):
             print(f"[Autostart Reg Error]: {e}")
 
     def load_settings(self):
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    api_keys = cfg.get("api_keys", {})
-                    modules = cfg.get("modules", {})
+        cfg = load_config()
+        api_keys = cfg.get("api_keys", {})
+        modules = cfg.get("modules", {})
 
-                    self.autostart_toggle.setChecked(cfg.get("autostart", False))
+        self.autostart_toggle.setChecked(cfg.get("autostart", False))
 
-                    gender_val = cfg.get("user_gender", "male").lower()
-                    idx_g = self.gender_combo.findData(gender_val)
-                    if idx_g != -1:
-                        self.gender_combo.setCurrentIndex(idx_g)
+        vol_val = int(cfg.get("voice_volume", 100))
+        self.voice_slider.setValue(vol_val)
+        self.lbl_vol_title.setText(f"Громкость речи: {vol_val}%")
 
-                    vpn_val = cfg.get("vpn_service", "none").lower()
-                    idx = self.vpn_combo.findData(vpn_val)
-                    if idx != -1:
-                        self.vpn_combo.setCurrentIndex(idx)
+        gender_val = cfg.get("user_gender", "male").lower()
+        idx_g = self.gender_combo.findData(gender_val)
+        if idx_g != -1:
+            self.gender_combo.setCurrentIndex(idx_g)
 
-                    use_sp = cfg.get("music_service", "yandex") == "spotify" or cfg.get("use_spotify", False)
-                    self.spotify_toggle.setChecked(use_sp)
+        vpn_val = cfg.get("vpn_service", "none").lower()
+        idx = self.vpn_combo.findData(vpn_val)
+        if idx != -1:
+            self.vpn_combo.setCurrentIndex(idx)
 
-                    w_apps = cfg.get("work_apps", [])
-                    self.work_apps_input.setText(", ".join(w_apps) if isinstance(w_apps, list) else str(w_apps))
+        use_sp = cfg.get("music_service", "yandex") == "spotify" or cfg.get("use_spotify", False)
+        self.spotify_toggle.setChecked(use_sp)
 
-                    r_apps = cfg.get("rest_apps", [])
-                    self.rest_apps_input.setText(", ".join(r_apps) if isinstance(r_apps, list) else str(r_apps))
+        w_apps = cfg.get("work_apps", [])
+        self.work_apps_input.setText(", ".join(w_apps) if isinstance(w_apps, list) else str(w_apps))
 
-                    self.gigachat_input.setText(api_keys.get("gigachat", ""))
-                    self.yandex_input.setText(api_keys.get("yandex_music_token", ""))
-                    self.yandex_iot_input.setText(api_keys.get("yandex_iot_token", ""))
-                    self.spotify_id_input.setText(api_keys.get("spotify_client_id", ""))
-                    self.spotify_secret_input.setText(api_keys.get("spotify_client_secret", ""))
-                    self.weather_input.setText(api_keys.get("weather", ""))
-                    self.hdrezka_input.setText(cfg.get("hdrezka_domain", "https://ru1.hdreskaz.top"))
+        r_apps = cfg.get("rest_apps", [])
+        self.rest_apps_input.setText(", ".join(r_apps) if isinstance(r_apps, list) else str(r_apps))
 
-                    vision_legacy = modules.get("vision", False)
-                    face_on = modules.get("face_recognition", vision_legacy)
-                    eye_on = modules.get("eye_tracking", vision_legacy)
-                    gest_on = modules.get("gestures", False)
+        self.gigachat_input.setText(api_keys.get("gigachat", ""))
+        self.yandex_input.setText(api_keys.get("yandex_music_token", ""))
+        self.yandex_iot_input.setText(api_keys.get("yandex_iot_token", ""))
+        self.spotify_id_input.setText(api_keys.get("spotify_client_id", ""))
+        self.spotify_secret_input.setText(api_keys.get("spotify_client_secret", ""))
+        self.weather_input.setText(api_keys.get("weather", ""))
+        self.hdrezka_input.setText(cfg.get("hdrezka_domain", "https://ru1.hdreskaz.top"))
 
-                    self.saved_vision_state = face_on or eye_on or gest_on
+        vision_legacy = modules.get("vision", False)
+        face_on = modules.get("face_recognition", vision_legacy)
+        eye_on = modules.get("eye_tracking", vision_legacy)
+        gest_on = modules.get("gestures", False)
 
-                    self.face_rec_toggle.blockSignals(True)
-                    self.eye_tracking_toggle.blockSignals(True)
-                    self.gestures_toggle.blockSignals(True)
+        self.saved_vision_state = face_on or eye_on or gest_on
 
-                    self.face_rec_toggle.setChecked(face_on)
-                    self.eye_tracking_toggle.setChecked(eye_on)
-                    self.gestures_toggle.setChecked(gest_on)
+        self.face_rec_toggle.blockSignals(True)
+        self.eye_tracking_toggle.blockSignals(True)
+        self.gestures_toggle.blockSignals(True)
 
-                    self.face_rec_toggle.blockSignals(False)
-                    self.eye_tracking_toggle.blockSignals(False)
-                    self.gestures_toggle.blockSignals(False)
-            except Exception as e:
-                print(f"[Settings Load Error]: {e}")
+        self.face_rec_toggle.setChecked(face_on)
+        self.eye_tracking_toggle.setChecked(eye_on)
+        self.gestures_toggle.setChecked(gest_on)
+
+        self.face_rec_toggle.blockSignals(False)
+        self.eye_tracking_toggle.blockSignals(False)
+        self.gestures_toggle.blockSignals(False)
 
         if os.path.exists(self.google_creds_path):
             try:
@@ -834,13 +855,7 @@ class SettingsFrame(QFrame):
                 print(f"[Google Creds Load Error]: {e}")
 
     def save_settings(self):
-        config_data = {}
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    config_data = json.load(f)
-            except Exception as e:
-                print(f"[Settings Read Error]: {e}")
+        config_data = load_config()
 
         if "api_keys" not in config_data or not isinstance(config_data["api_keys"], dict):
             config_data["api_keys"] = {}
@@ -851,6 +866,7 @@ class SettingsFrame(QFrame):
         config_data["autostart"] = autostart_val
         self._apply_windows_autostart(autostart_val)
 
+        config_data["voice_volume"] = self.voice_slider.value()
         config_data["user_gender"] = self.gender_combo.currentData()
         config_data["vpn_service"] = self.vpn_combo.currentData()
 
@@ -889,9 +905,7 @@ class SettingsFrame(QFrame):
         config_data["modules"]["vision"] = any_vision_on
 
         try:
-            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(config_data, f, ensure_ascii=False, indent=4)
+            save_config(config_data)
 
             google_text = self.google_input.text().strip()
             if google_text:

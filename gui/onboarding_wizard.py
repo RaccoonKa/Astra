@@ -14,7 +14,7 @@ from PyQt6.QtGui import (
     QBrush, QPainterPath, QFont, QFontDatabase
 )
 
-from core.utils.config import save_config, load_config
+from core.utils.config import save_config, load_config, get_user_data_path, get_resource_path
 from gui.settings_window import ModernToggle, NoScrollComboBox
 
 WIZARD_STYLE = """
@@ -248,7 +248,7 @@ class OnboardingWizard(QDialog):
         self.config = config
         self.drag_position = QPoint()
 
-        font_path = os.path.join("assets", "fonts", "Schiffbauer-Regular.otf")
+        font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
         font_id = QFontDatabase.addApplicationFont(font_path)
         if font_id != -1:
             self.font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
@@ -572,7 +572,7 @@ class OnboardingWizard(QDialog):
     def _add_owner_face(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Выбери свои лучшие фотки ✨", "", "Images (*.png *.jpg *.jpeg)")
         if files:
-            face_dir = os.path.join("personal_data", "owner_face")
+            face_dir = os.path.normpath(get_user_data_path("..", "owner_face"))
             os.makedirs(face_dir, exist_ok=True)
             count = 0
             for f in files:

@@ -1,5 +1,4 @@
 import os
-import json
 import re
 import random
 import threading
@@ -8,6 +7,7 @@ import hashlib
 import xml.etree.ElementTree as ET
 import requests
 import webbrowser
+from core.utils.config import load_config
 
 vlc_paths = [
     r"C:\Program Files\VideoLAN\VLC",
@@ -64,18 +64,8 @@ class YandexMusicManager:
         if self.client is not None:
             return True
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-        raw_token = ""
-
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    raw_token = cfg.get("api_keys", {}).get("yandex_music_token", "")
-            except Exception:
-                pass
-
+        cfg = load_config()
+        raw_token = cfg.get("api_keys", {}).get("yandex_music_token", "")
         token = self._extract_pure_token(raw_token)
 
         if not token:

@@ -1,13 +1,12 @@
 import os
 import json
 import threading
+from core.utils.config import get_user_data_path
 
 
 class MemoryManager:
     def __init__(self):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_dir = os.path.dirname(os.path.dirname(script_dir))
-        self.memory_file = os.path.join(project_dir, "personal_data", "configs", "user_memory.json")
+        self.memory_file = get_user_data_path("user_memory.json")
         self.lock = threading.Lock()
         self.facts = self._load_facts()
 

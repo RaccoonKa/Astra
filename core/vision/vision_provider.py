@@ -1,9 +1,8 @@
 import time
-import json
-from pathlib import Path
 import cv2
 import numpy as np
 from PyQt6.QtCore import QThread, pyqtSignal
+from core.utils.config import load_config
 
 
 class VisionThread(QThread):
@@ -37,15 +36,11 @@ class VisionThread(QThread):
         self.last_is_owner = True
 
     def _update_modules_config(self):
-        base_dir = Path(__file__).resolve().parent.parent.parent
-        config_path = base_dir / "personal_data" / "configs" / "config.json"
-        if config_path.exists():
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    self.cached_modules = cfg.get("modules", {})
-            except Exception:
-                pass
+        try:
+            cfg = load_config()
+            self.cached_modules = cfg.get("modules", {})
+        except Exception:
+            pass
 
     def run(self):
         self._update_modules_config()

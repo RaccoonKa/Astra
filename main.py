@@ -1,3 +1,23 @@
+import inspect
+
+
+_orig_findsource = inspect.findsource
+def _safe_findsource(obj):
+    try:
+        return _orig_findsource(obj)
+    except Exception:
+        return (["\n"], 0)
+inspect.findsource = _safe_findsource
+
+_orig_getsource = inspect.getsource
+def _safe_getsource(obj):
+    try:
+        return _orig_getsource(obj)
+    except Exception:
+        return "\n"
+inspect.getsource = _safe_getsource
+
+
 import os
 import sys
 import ctypes

@@ -27,6 +27,7 @@ from core.nlp.command_parser import CommandParser
 from core.system.actions import SystemActions
 from core.vision.vision_provider import VisionThread
 from core.vision.presence_manager import PresenceManager
+from core.utils.config import get_resource_path
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
 from comtypes import CoInitialize, CoUninitialize
 
@@ -96,6 +97,7 @@ class AudioVisualizerWorker(QThread):
         if self.isRunning():
             self.wait(200)
 
+
 class CommandWorker(QThread):
     result_ready = pyqtSignal(object)
 
@@ -115,6 +117,7 @@ class CommandWorker(QThread):
             attached_file=self.attached_file
         )
         self.result_ready.emit(response)
+
 
 class AstraMicWidget(QFrame):
     clicked = pyqtSignal()
@@ -692,12 +695,7 @@ class MainWindow(QWidget):
             self.telegram_thread.start()
 
     def init_ui(self):
-        base_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
-        font_path = os.path.join(base_dir, "assets", "fonts", "Schiffbauer-Regular.otf")
-
-        if not os.path.exists(font_path):
-            font_path = os.path.join("assets", "fonts", "Schiffbauer-Regular.otf")
-
+        font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
         font_id = QFontDatabase.addApplicationFont(font_path)
 
         if font_id != -1:
@@ -705,7 +703,6 @@ class MainWindow(QWidget):
             self.font_family = families[0] if families else "Arial"
             self.custom_font = QFont(self.font_family, 11)
         else:
-            print("[UI Warning]: Не удалось загрузить шрифт. Используем системный.")
             self.font_family = "Arial"
             self.custom_font = QFont(self.font_family, 11)
 

@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import subprocess
 import ctypes
@@ -16,8 +17,15 @@ pyautogui.FAILSAFE = False
 
 class GuiAdapter:
     def __init__(self):
-        self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.templates_dir = os.path.join(self.base_dir, "templates")
+        if getattr(sys, 'frozen', False):
+            base_app = os.path.dirname(sys.executable)
+            cand1 = os.path.join(base_app, "services", "vpn", "templates")
+            cand2 = os.path.join(base_app, "templates")
+            self.templates_dir = cand1 if os.path.exists(cand1) else cand2
+        else:
+            self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.templates_dir = os.path.join(self.base_dir, "templates")
+
         self._cached_sota_target = None
         self._cached_happ_target = None
 

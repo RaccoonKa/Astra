@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import queue
 import time
@@ -6,6 +7,7 @@ import sounddevice as sd
 import vosk
 from PyQt6.QtCore import QThread, pyqtSignal
 from core.nlp.asr_corrector import ASRCorrector
+from core.utils.config import load_config, get_resource_path
 
 
 class STTThread(QThread):
@@ -15,7 +17,11 @@ class STTThread(QThread):
 
     def __init__(self, model_path=None, parent=None):
         super().__init__(parent)
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
         self.model_path = model_path if model_path else os.path.join(base_dir, "optimized_models", "model_vosk")
         self._running = True
         self.samplerate = 16000
@@ -23,19 +29,10 @@ class STTThread(QThread):
         self.manual_trigger_flag = False
         self.is_speaking = False
         self.corrector = ASRCorrector()
+        self.model_path = model_path if model_path else get_resource_path("optimized_models", "model_vosk")
 
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-        template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-        target_path = config_path if os.path.exists(config_path) else template_path
-
-        assistant_name = "астра"
-        if os.path.exists(target_path):
-            try:
-                with open(target_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    assistant_name = cfg.get("assistant_name", "астра").lower()
-            except Exception:
-                pass
+        cfg = load_config()
+        assistant_name = cfg.get("assistant_name", "астра").lower()
 
         self.wake_words = {
             assistant_name,

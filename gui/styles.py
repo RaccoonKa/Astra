@@ -165,6 +165,27 @@ QComboBox QAbstractItemView {
     outline: none;
 }
 
+QSlider#VoiceSlider::groove:horizontal {
+    height: 4px;
+    background: rgba(92, 78, 26, 0.4);
+    border-radius: 2px;
+}
+QSlider#VoiceSlider::sub-page:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #a88820, stop:1 #ffd700);
+    border-radius: 2px;
+}
+QSlider#VoiceSlider::handle:horizontal {
+    background: #ffd700;
+    border: 1px solid #ffffff;
+    width: 14px;
+    margin-top: -5px;
+    margin-bottom: -5px;
+    border-radius: 7px;
+}
+QSlider#VoiceSlider::handle:horizontal:hover {
+    background: #ffffff;
+}
+
 QPushButton#HintCircleBtn {
     background-color: rgba(92, 78, 26, 0.25);
     color: #c4a028;

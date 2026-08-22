@@ -1,7 +1,5 @@
-from pathlib import Path
 import torch
 import onnxruntime as ort
-
 
 session_options = ort.SessionOptions()
 session_options.intra_op_num_threads = 2
@@ -15,12 +13,13 @@ if not hasattr(torch, "uint4"):
 
 from transformers import AutoTokenizer
 from optimum.onnxruntime import ORTModelForSeq2SeqLM
+from core.utils.config import get_resource_path
+
 
 class ASRCorrector:
     def __init__(self, model_dir: str = None):
         if model_dir is None:
-            base_dir = Path(__file__).resolve().parent.parent.parent
-            model_dir = str(base_dir / "optimized_models" / "corrector")
+            model_dir = get_resource_path("optimized_models", "corrector")
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
         self.model = ORTModelForSeq2SeqLM.from_pretrained(

@@ -1,22 +1,27 @@
 import os
+import sys
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from core.utils.config import get_user_data_path
 
 SCOPES = [
     'https://www.googleapis.com/auth/contacts.readonly',
     'https://www.googleapis.com/auth/youtube.readonly'
 ]
 
+
 class GoogleContactsManager:
     def __init__(self):
-        self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        self.config_dir = os.path.join(self.base_dir, "personal_data", "configs", "google")
-        os.makedirs(self.config_dir, exist_ok=True)
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if getattr(sys, 'frozen', False):
+            app_dir = os.path.dirname(sys.executable)
+        else:
+            app_dir = base_dir
 
-        self.creds_path = os.path.join(self.config_dir, "credentials.json")
-        self.token_path = os.path.join(self.config_dir, "token.json")
+        self.creds_path = os.path.join(app_dir, "personal_data", "configs", "google", "credentials.json")
+        self.token_path = get_user_data_path("google", "token.json")
 
     def _get_credentials(self):
         creds = None
@@ -41,6 +46,7 @@ class GoogleContactsManager:
                 flow = InstalledAppFlow.from_client_secrets_file(self.creds_path, SCOPES)
                 creds = flow.run_local_server(port=0)
 
+            os.makedirs(os.path.dirname(self.token_path), exist_ok=True)
             with open(self.token_path, 'w', encoding='utf-8') as token_file:
                 token_file.write(creds.to_json())
 

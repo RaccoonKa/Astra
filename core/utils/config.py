@@ -1,12 +1,20 @@
 import json
 import os
+import sys
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", ".."))
 
-CONFIG_DIR = os.path.join(ROOT_DIR, "personal_data", "configs")
+if getattr(sys, 'frozen', False):
+    APP_DIR = os.path.dirname(sys.executable)
+    USER_DATA_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Astra")
+else:
+    APP_DIR = ROOT_DIR
+    USER_DATA_DIR = os.path.join(ROOT_DIR, "personal_data")
+
+CONFIG_DIR = os.path.join(USER_DATA_DIR, "configs") if getattr(sys, 'frozen', False) else os.path.join(ROOT_DIR, "personal_data", "configs")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
-TEMPLATE_FILE = os.path.join(CONFIG_DIR, "config.template.json")
+TEMPLATE_FILE = os.path.join(APP_DIR, "personal_data", "configs", "config.template.json")
 
 DEFAULT_CONFIG = {
     "user_name": "друг",
@@ -20,6 +28,7 @@ DEFAULT_CONFIG = {
     "use_spotify": False,
     "vpn_service": "",
     "hdrezka_domain": "https://ru1.hdreskaz.top",
+    "voice_volume": 100,
     "work_apps": [
         "https://github.com"
     ],
@@ -49,6 +58,26 @@ DEFAULT_CONFIG = {
 }
 
 
+def get_resource_path(*subpaths) -> str:
+    if getattr(sys, 'frozen', False):
+        base_internal = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        cand_internal = os.path.join(base_internal, *subpaths)
+        if os.path.exists(cand_internal):
+            return cand_internal
+        cand_root = os.path.join(os.path.dirname(sys.executable), *subpaths)
+        if os.path.exists(cand_root):
+            return cand_root
+        return cand_internal
+    else:
+        return os.path.join(ROOT_DIR, *subpaths)
+
+
+def get_user_data_path(*subpaths) -> str:
+    path = os.path.join(CONFIG_DIR, *subpaths)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return path
+
+
 def _deep_merge(default: dict, custom: dict) -> dict:
     merged = default.copy()
     for key, value in custom.items():
@@ -60,6 +89,8 @@ def _deep_merge(default: dict, custom: dict) -> dict:
 
 
 def load_config() -> dict:
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:

@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import librosa
 import onnxruntime as ort
@@ -16,7 +17,11 @@ EMOTION_TRANSLATION = {
 
 class EmotionClassifier:
     def __init__(self, model_rel_path="optimized_models/emotion_crnn/model_crnn_quant.onnx"):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
         model_path = os.path.join(base_dir, model_rel_path)
 
         if not os.path.exists(model_path):

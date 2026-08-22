@@ -6,12 +6,13 @@ import psutil
 import re
 import ctypes
 import urllib.parse
-import json
 import random
 from PIL import ImageGrab
 import pyautogui
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL, CoInitialize
+
+from core.utils.config import load_config, get_user_data_path
 from services.wikipedia.wikipedia_manager import WikipediaManager
 from services.yandex.yandex_music_manager import YandexMusicManager
 from services.google.youtube_manager import YouTubeManager
@@ -39,23 +40,8 @@ MUSIC_PHRASES = [
 ]
 
 
-def _load_config():
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-    template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-
-    target_path = config_path if os.path.exists(config_path) else template_path
-    if os.path.exists(target_path):
-        try:
-            with open(target_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
-
-
 def _is_spotify_active():
-    cfg = _load_config()
+    cfg = load_config()
     return cfg.get("music_service") == "spotify" or cfg.get("use_spotify", False)
 
 
@@ -609,9 +595,10 @@ class SystemActions:
 
     @staticmethod
     def take_screenshot():
-        os.makedirs("screenshots", exist_ok=True)
+        screenshots_dir = os.path.normpath(get_user_data_path("..", "screenshots"))
+        os.makedirs(screenshots_dir, exist_ok=True)
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        path = f"screenshots/screenshot_{timestamp}.png"
+        path = os.path.join(screenshots_dir, f"screenshot_{timestamp}.png")
         img = ImageGrab.grab()
         img.save(path)
         return "Скриншот экрана сохранен"
@@ -752,17 +739,8 @@ class SystemActions:
                 query = query.replace(word, "")
             query = query.strip()
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-        domain = "https://ru1.hdreskaz.top"
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if "hdrezka_domain" in data and data["hdrezka_domain"]:
-                        domain = data["hdrezka_domain"].rstrip("/")
-            except Exception:
-                pass
+        cfg = load_config()
+        domain = cfg.get("hdrezka_domain", "https://ru1.hdreskaz.top").rstrip("/")
 
         if not query:
             webbrowser.open(domain)
@@ -791,7 +769,7 @@ class SystemActions:
 
     @staticmethod
     def mode_work(text=""):
-        cfg = _load_config()
+        cfg = load_config()
         apps = cfg.get("work_apps", [])
         if isinstance(apps, str):
             apps = [x.strip() for x in apps.split(",") if x.strip()]
@@ -811,7 +789,7 @@ class SystemActions:
 
     @staticmethod
     def mode_rest(text=""):
-        cfg = _load_config()
+        cfg = load_config()
         apps = cfg.get("rest_apps", [])
         if isinstance(apps, str):
             apps = [x.strip() for x in apps.split(",") if x.strip()]
@@ -866,7 +844,7 @@ class SystemActions:
 
     @staticmethod
     def get_weather(text="", slots=None):
-        cfg = _load_config()
+        cfg = load_config()
         api_key = cfg.get("api_keys", {}).get("weather", "")
         default_city = cfg.get("city") or cfg.get("weather_city", "Москва")
 

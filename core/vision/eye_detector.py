@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from collections import deque
 import cv2
@@ -10,8 +11,10 @@ from mediapipe.tasks.python import vision
 
 class EyeDetector:
     def __init__(self):
-        script_dir = Path(__file__).resolve().parent
-        project_dir = script_dir.parent.parent
+        if getattr(sys, 'frozen', False):
+            project_dir = Path(sys.executable).parent
+        else:
+            project_dir = Path(__file__).resolve().parent.parent.parent
 
         candidate_paths = [
             project_dir / "optimized_models" / "eye_model" / "eye_state_model.onnx",

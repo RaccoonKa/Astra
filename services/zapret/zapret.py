@@ -1,9 +1,9 @@
 import os
-import json
 import time
 import psutil
 import ctypes
 import re
+from core.utils.config import load_config
 
 
 class ZapretManager:
@@ -33,30 +33,18 @@ class ZapretManager:
     def __init__(self):
         self.process_name = "winws.exe"
 
-    def _get_config_path(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-        template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-        return config_path if os.path.exists(config_path) else template_path
-
     def _find_zapret_dir(self):
-        config_path = self._get_config_path()
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    custom_path = cfg.get("zapret_path", "") or cfg.get("paths", {}).get("zapret", "")
-                    if custom_path and os.path.exists(custom_path):
-                        if os.path.isdir(custom_path):
-                            if any(os.path.exists(os.path.join(custom_path, s)) for s in self.STRATEGIES):
-                                return custom_path
-                            parent = os.path.dirname(custom_path)
-                            if any(os.path.exists(os.path.join(parent, s)) for s in self.STRATEGIES):
-                                return parent
-                            return custom_path
-                        return os.path.dirname(custom_path)
-            except Exception:
-                pass
+        cfg = load_config()
+        custom_path = cfg.get("zapret_path", "") or cfg.get("paths", {}).get("zapret", "")
+        if custom_path and os.path.exists(custom_path):
+            if os.path.isdir(custom_path):
+                if any(os.path.exists(os.path.join(custom_path, s)) for s in self.STRATEGIES):
+                    return custom_path
+                parent = os.path.dirname(custom_path)
+                if any(os.path.exists(os.path.join(parent, s)) for s in self.STRATEGIES):
+                    return parent
+                return custom_path
+            return os.path.dirname(custom_path)
 
         user_home = os.path.expanduser("~")
         search_dirs = [

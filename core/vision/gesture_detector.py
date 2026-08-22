@@ -1,6 +1,5 @@
-# Файл считывания положения фаланг пальцев.
-
 import os
+import sys
 import cv2
 import urllib.request
 import numpy as np
@@ -11,25 +10,31 @@ from mediapipe.tasks.python import vision
 
 
 def get_hand_model_path():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_dir = os.path.dirname(os.path.dirname(script_dir))
+    if getattr(sys, 'frozen', False):
+        project_dir = os.path.dirname(sys.executable)
+    else:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_dir = os.path.dirname(os.path.dirname(script_dir))
+
+    candidate_paths = [
+        os.path.join(project_dir, "optimized_models", "hand_landmaker", "hand_landmarker.task"),
+        os.path.join(project_dir, "optimized_models", "hand_landmarker", "hand_landmarker.task"),
+        os.path.join(project_dir, "optimized_models", "hand_landmarker.task")
+    ]
+
+    for p in candidate_paths:
+        if os.path.exists(p) and os.path.getsize(p) >= 5000000:
+            return p
+
     models_dir = os.path.join(project_dir, "optimized_models", "hand_landmaker")
     os.makedirs(models_dir, exist_ok=True)
-
     model_path = os.path.join(models_dir, "hand_landmarker.task")
 
-    if os.path.exists(model_path) and os.path.getsize(model_path) < 5000000:
-        try:
-            os.remove(model_path)
-        except Exception:
-            pass
-
-    if not os.path.exists(model_path):
-        url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-        try:
-            urllib.request.urlretrieve(url, model_path)
-        except Exception as e:
-            print(f"[MODEL DOWNLOAD ERROR]: {e}")
+    url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+    try:
+        urllib.request.urlretrieve(url, model_path)
+    except Exception as e:
+        print(f"[MODEL DOWNLOAD ERROR]: {e}")
 
     return model_path
 
@@ -89,23 +94,18 @@ class GestureDetector:
             ring_open = not ring_folded
             pinky_open = not pinky_folded
 
-            # Кулак: все 4 пальца сжаты к ладони
             if index_folded and middle_folded and ring_folded and pinky_folded:
                 return "fist"
 
-            # Победа (V): указательный и средний открыты, остальные сжаты
             if index_open and middle_open and ring_folded and pinky_folded:
                 return "victory"
 
-            # Указательный палец вверх
             if index_open and middle_folded and ring_folded and pinky_folded:
                 return "pointing"
 
-            # Открытая ладонь: все пальцы открыты
             if index_open and middle_open and ring_open and pinky_open:
                 return "open_palm"
 
-            # Лайк
             thumb_up = lm[4].y < lm[3].y and lm[3].y < lm[2].y
             if thumb_up and index_folded and middle_folded and ring_folded and pinky_folded:
                 return "thumbs_up"

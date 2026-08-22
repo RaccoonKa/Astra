@@ -1,5 +1,6 @@
 import os
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
+from core.utils.config import get_user_data_path
 
 
 class PresenceManager(QObject):
@@ -21,10 +22,7 @@ class PresenceManager(QObject):
         self.load_owner_faces()
 
     def load_owner_faces(self):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_dir = os.path.dirname(os.path.dirname(script_dir))
-        owner_folder = os.path.join(project_dir, "personal_data", "owner_face")
-
+        owner_folder = os.path.normpath(get_user_data_path("..", "owner_face"))
         self.owner_encodings = []
 
         if os.path.exists(owner_folder):

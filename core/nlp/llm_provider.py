@@ -1,6 +1,5 @@
-import os
-import json
 from gigachat import GigaChat
+from core.utils.config import load_config
 from core.nlp.memory import MemoryManager
 
 
@@ -17,31 +16,14 @@ class GigaChatProvider:
         if self.client is not None:
             return True, ""
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-        template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-
-        target_path = config_path if os.path.exists(config_path) else template_path
-
-        credentials = ""
-        user_name = "друг"
-        user_gender = "male"
-        assistant_name = "Астра"
-
-        if os.path.exists(target_path):
-            try:
-                with open(target_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    credentials = cfg.get("api_keys", {}).get("gigachat", "")
-                    user_name = cfg.get("user_name", "друг")
-                    user_gender = cfg.get("user_gender", "male")
-                    assistant_name = cfg.get("assistant_name", "Астра")
-            except Exception:
-                pass
+        cfg = load_config()
+        credentials = cfg.get("api_keys", {}).get("gigachat", "")
+        user_name = cfg.get("user_name", "друг")
+        user_gender = cfg.get("user_gender", "male")
+        assistant_name = cfg.get("assistant_name", "Астра")
 
         if str(user_gender).lower() in ["female", "женский", "ж"]:
-            gender_instruction = "Женский. Обращайся к пользователю ИСКЛЮЧИТЕЛЬНО в женском роде (например: 'ты добавила', 'ты сказал(а)' -> 'ты сказала', 'ты сама', 'ты готова', 'ты сделала')."
+            gender_instruction = "Женский. Обращайся к пользователю ИСКЛЮЧИТЕЛЬНО в женском роде (например: 'ты добавила', 'ты сказала', 'ты сама', 'ты готова', 'ты сделала')."
         else:
             gender_instruction = "Мужской. Обращайся к пользователю ИСКЛЮЧИТЕЛЬНО в мужском роде (например: 'ты добавил', 'ты сказал', 'ты сам', 'ты готов', 'ты сделал'). Никогда не употребляй женские окончания при обращении к пользователю!"
 

@@ -1,6 +1,5 @@
-import os
 import re
-import json
+from core.utils.config import load_config, save_config
 from services.vpn.adapters.core_adapter import CoreAdapter
 from services.vpn.adapters.gui_adapter import GuiAdapter
 
@@ -48,34 +47,15 @@ class VpnManager:
         self.gui = GuiAdapter()
         self.last_active_vpn = None
 
-    def _get_config_path(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        return os.path.join(base_dir, "personal_data", "configs", "config.json")
-
     def get_configured_vpn(self) -> str:
-        cfg_path = self._get_config_path()
-        if os.path.exists(cfg_path):
-            try:
-                with open(cfg_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    return cfg.get("vpn_service", "none").lower()
-            except Exception:
-                pass
-        return "none"
+        cfg = load_config()
+        return cfg.get("vpn_service", "none").lower()
 
     def set_configured_vpn(self, vpn_type: str):
-        cfg_path = self._get_config_path()
-        cfg_data = {}
-        if os.path.exists(cfg_path):
-            try:
-                with open(cfg_path, "r", encoding="utf-8") as f:
-                    cfg_data = json.load(f)
-            except Exception:
-                pass
-        cfg_data["vpn_service"] = vpn_type
+        cfg = load_config()
+        cfg["vpn_service"] = vpn_type
         try:
-            with open(cfg_path, "w", encoding="utf-8") as f:
-                json.dump(cfg_data, f, ensure_ascii=False, indent=4)
+            save_config(cfg)
         except Exception as e:
             print(f"[VpnManager Save Error]: {e}")
 

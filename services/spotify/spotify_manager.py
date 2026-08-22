@@ -1,5 +1,4 @@
 import os
-import json
 import random
 import threading
 import subprocess
@@ -8,6 +7,7 @@ import winreg
 import re
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from core.utils.config import load_config, get_user_data_path
 
 
 class SpotifyManager:
@@ -24,21 +24,10 @@ class SpotifyManager:
         self.device_id = None
 
     def _load_credentials(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-        template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-        target_path = config_path if os.path.exists(config_path) else template_path
-
-        client_id, client_secret = "", ""
-        if os.path.exists(target_path):
-            try:
-                with open(target_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    api_keys = cfg.get("api_keys", {})
-                    client_id = api_keys.get("spotify_client_id", "")
-                    client_secret = api_keys.get("spotify_client_secret", "")
-            except Exception:
-                pass
+        cfg = load_config()
+        api_keys = cfg.get("api_keys", {})
+        client_id = api_keys.get("spotify_client_id", "")
+        client_secret = api_keys.get("spotify_client_secret", "")
         return client_id, client_secret
 
     def _init_client(self):
@@ -49,10 +38,7 @@ class SpotifyManager:
         if not client_id or not client_secret:
             return False
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        cache_dir = os.path.join(base_dir, "personal_data", "configs")
-        os.makedirs(cache_dir, exist_ok=True)
-        cache_path = os.path.join(cache_dir, ".spotify_cache")
+        cache_path = get_user_data_path(".spotify_cache")
 
         try:
             auth_manager = SpotifyOAuth(

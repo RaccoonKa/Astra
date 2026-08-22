@@ -1,13 +1,18 @@
 import re
 import os
+import sys
 import torch
 import sounddevice as sd
 import numpy as np
-from scipy.signal import butter, filtfilt
 from PyQt6.QtCore import QThread, pyqtSignal
+from core.utils.config import get_resource_path, load_config
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, "optimized_models", "silero_tts", "v4_ru.pt")
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+DEFAULT_MODEL_PATH = get_resource_path("optimized_models", "silero_tts", "v4_ru.pt")
 
 
 class TTSThread(QThread):
@@ -29,9 +34,7 @@ class TTSThread(QThread):
         self._play_cached_flag = False
         self.greeting_to_precache = ""
         self.cached_greeting_audio = None
-        self.warmup_text = ("Астра, доброе утро! Все системы функционируют в штатном режиме. Проверка речевого тракта завершена, частота дискретизации стабильна. Слушаю вас внимательно. "
-                            "Астра, приветствую! Жду дальнейших указаний. Шестнадцать каналов связи прослушиваются, шифрование активно, динамики прогреты до рабочей температуры. Порядок."
-                            "С этим +токеном я смогу управлять твоим умным домом! Включать и выключать свет, менять яркость лампочек, управлять розетками и запускать сценарии в Доме с Алисой.")
+        self.warmup_text = "Астра"
 
     def _init_model(self):
         if self.model is None and os.path.exists(self.model_path):
@@ -43,11 +46,16 @@ class TTSThread(QThread):
             except Exception as e:
                 print(f"[TTS Init Error]: {e}")
 
-    def _soften_audio(self, audio_np, cutoff=7000):
-        nyquist = 0.5 * self.sample_rate
-        normal_cutoff = cutoff / nyquist
-        b, a = butter(1, normal_cutoff, btype='low', analog=False)
-        return filtfilt(b, a, audio_np)
+    def _process_audio_level(self, audio_np):
+        peak = np.max(np.abs(audio_np))
+        if peak > 0.001:
+            audio_np = audio_np / peak
+
+        cfg = load_config()
+        vol_percent = cfg.get("voice_volume", 100)
+        vol_factor = max(0.0, min(1.0, vol_percent / 100.0))
+
+        return (audio_np * vol_factor).astype(np.float32)
 
     def _clean_text_for_tts(self, text):
         if not text:
@@ -132,8 +140,7 @@ class TTSThread(QThread):
                             speaker=self.speaker,
                             sample_rate=self.sample_rate
                         )
-                    audio_np = audio.numpy()
-                    audio_np = self._soften_audio(audio_np, cutoff=7000)
+                    audio_np = self._process_audio_level(audio.numpy())
                     padding = np.zeros(int(self.sample_rate * 0.2), dtype=np.float32)
                     self.cached_greeting_audio = np.concatenate([audio_np, padding])
 
@@ -166,9 +173,7 @@ class TTSThread(QThread):
             if self._stopped:
                 return
 
-            audio_np = audio.numpy()
-            audio_np = self._soften_audio(audio_np, cutoff=7000)
-
+            audio_np = self._process_audio_level(audio.numpy())
             padding = np.zeros(int(self.sample_rate * 0.2), dtype=np.float32)
             audio_padded = np.concatenate([audio_np, padding])
 

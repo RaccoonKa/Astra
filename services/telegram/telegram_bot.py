@@ -23,14 +23,18 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from core.utils.config import load_config, save_config
+if getattr(sys, 'frozen', False):
+    APP_DIR = Path(sys.executable).parent
+else:
+    APP_DIR = ROOT_DIR
+
+from core.utils.config import load_config, save_config, get_user_data_path
 from core.nlp.command_parser import CommandParser
 from core.nlp.asr_corrector import ASRCorrector
 
-CONFIG_PATH = ROOT_DIR / "personal_data" / "configs" / "config.json"
-PAIRING_PATH = ROOT_DIR / "personal_data" / "configs" / "pairing_session.json"
-VOSK_MODEL_PATH = ROOT_DIR / "optimized_models" / "model_vosk"
-SILERO_PATH = ROOT_DIR / "optimized_models" / "silero_tts" / "v4_ru.pt"
+PAIRING_PATH = Path(get_user_data_path("pairing_session.json"))
+VOSK_MODEL_PATH = APP_DIR / "optimized_models" / "model_vosk"
+SILERO_PATH = APP_DIR / "optimized_models" / "silero_tts" / "v4_ru.pt"
 
 dp = Dispatcher()
 current_bot_instance = None

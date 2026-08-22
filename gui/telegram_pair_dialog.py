@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QTimer, QRectF, QPoint, QUrl
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QPainterPath, QFont, QPixmap, QDesktopServices
 )
+from core.utils.config import get_user_data_path
 
 
 class TelegramPairDialog(QDialog):
@@ -21,8 +22,7 @@ class TelegramPairDialog(QDialog):
         self.font_family = font_family
         self.drag_position = QPoint()
 
-        base_dir = Path(__file__).resolve().parent.parent
-        self.session_path = base_dir / "personal_data" / "configs" / "pairing_session.json"
+        self.session_path = Path(get_user_data_path("pairing_session.json"))
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)

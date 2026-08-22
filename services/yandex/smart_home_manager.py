@@ -1,7 +1,6 @@
-import os
-import json
 import requests
 import re
+from core.utils.config import load_config
 
 
 class SmartHomeManager:
@@ -13,20 +12,9 @@ class SmartHomeManager:
         self.rooms_cache = {}
 
     def _get_token(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-        template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-        target_path = config_path if os.path.exists(config_path) else template_path
-
-        if os.path.exists(target_path):
-            try:
-                with open(target_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    keys = cfg.get("api_keys", {})
-                    return keys.get("yandex_iot_token") or keys.get("yandex_token") or keys.get("yandex_music", "")
-            except Exception:
-                pass
-        return ""
+        cfg = load_config()
+        keys = cfg.get("api_keys", {})
+        return keys.get("yandex_iot_token") or keys.get("yandex_token") or keys.get("yandex_music", "")
 
     def _get_headers(self):
         token = self._get_token()

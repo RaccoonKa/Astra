@@ -3,12 +3,12 @@ import json
 import numpy as np
 import onnxruntime as ort
 from transformers import AutoTokenizer
+from core.utils.config import get_resource_path
 
 
 class JointNLU:
     def __init__(self, model_dir="optimized_models/joint_nlu"):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        full_model_dir = os.path.join(base_dir, model_dir)
+        full_model_dir = get_resource_path("optimized_models", "joint_nlu")
 
         config_path = os.path.join(full_model_dir, "nlu_config.json")
         with open(config_path, "r", encoding="utf-8") as f:

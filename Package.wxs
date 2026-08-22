@@ -1,0 +1,50 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Astra Voice Assistant"
+           Manufacturer="Svetozar Kravchuk"
+           Version="1.0.0.0"
+           UpgradeCode="4F82C9E4-1B18-4E4D-B5F2-81D6C7892301">
+
+    <MajorUpgrade DowngradeErrorMessage="Более новая версия Астры уже установлена на компьютере." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Astra" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="ApplicationShortcut" Guid="7B91F248-8C65-4C41-8930-5A3E92B1C840">
+        <Shortcut Id="ApplicationStartMenuShortcut"
+                  Name="Astra"
+                  Description="Голосовой ассистент Астра"
+                  Target="[INSTALLFOLDER]Astra.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon.ico" />
+        <RegistryValue Root="HKCU" Key="Software\Astra" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="2C8E1903-82BA-4F71-92D0-3D8F9A0B7C61">
+        <Shortcut Id="ApplicationDesktopShortcut"
+                  Name="Astra"
+                  Description="Голосовой ассистент Астра"
+                  Target="[INSTALLFOLDER]Astra.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon.ico" />
+        <RegistryValue Root="HKCU" Key="Software\Astra" Name="desktop_shortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Icon Id="AppIcon.ico" SourceFile="assets\icon\ico\icon_round.ico" />
+
+    <ComponentGroup Id="ProductComponents">
+      <Files Include="dist\Astra\**" />
+    </ComponentGroup>
+
+    <Feature Id="MainApplication" Title="Astra" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+  </Package>
+</Wix>
