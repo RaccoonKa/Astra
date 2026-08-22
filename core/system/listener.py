@@ -1,27 +1,18 @@
 import os
-import json
 import queue
+import json
 import sounddevice as sd
 import vosk
+from core.utils.config import load_config
 from core.nlp.asr_corrector import ASRCorrector
 
 
 class SpeechListener:
     def __init__(self, device_id=None):
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-        config_path = os.path.join(base_dir, "personal_data", "configs", "config.json")
-        template_path = os.path.join(base_dir, "personal_data", "configs", "config.template.json")
-        target_path = config_path if os.path.exists(config_path) else template_path
-
-        assistant_name = "астра"
-        if os.path.exists(target_path):
-            try:
-                with open(target_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    assistant_name = cfg.get("assistant_name", "астра").lower()
-            except Exception:
-                pass
+        cfg = load_config()
+        assistant_name = cfg.get("assistant_name", "астра").lower()
 
         self.wake_words = {
             assistant_name,
