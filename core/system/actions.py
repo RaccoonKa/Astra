@@ -302,6 +302,10 @@ class SystemActions:
     def shutdown_pc(text=""):
         text_low = text.lower() if text else ""
 
+        zapret_safety = ["запрет", "обход", "winws", "zapret", "зарпет", "зпрет"]
+        if any(w in text_low for w in zapret_safety):
+            return SystemActions.stop_zapret(text)
+
         appliances_safety = [
             "телик", "телевизор", "тв", "tv", "свет", "ламп", "люстр", "розетк", "лент", "гирлянд",
             "увлажнител", "чайник", "пылесос", "кондиционер", "кондер", "музык", "трек", "песн", "звук",

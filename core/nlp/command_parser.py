@@ -131,6 +131,16 @@ class CommandParser:
             if any(sv in text_low for sv in start_verbs) or has_generic_vpn or parsed_vpn != "none":
                 return "start_vpn"
 
+        zapret_roots = ["запрет", "обход", "winws", "zapret", "за прет", "запреты", "заперт"]
+        if any(zr in text_low for zr in zapret_roots):
+            stop_verbs = ["выключ", "отключ", "выруб", "останов", "заглуш", "погас", "стоп", "закрой", "убери", "сними", "вырубай", "выключай"]
+            start_verbs = ["включ", "запуст", "вруб", "подключ", "открой", "активир", "стартуй", "подруби", "поставь", "смени", "поменяй", "выбери", "список", "какой", "какие", "покажи"]
+
+            if any(sv in text_low for sv in stop_verbs):
+                return "stop_zapret"
+            if any(sv in text_low for sv in start_verbs) or any(w in text_low for w in ["список", "меню", "вариант", "стратеги"]):
+                return "start_zapret"
+
         shutdown_triggers = [
             "выключи компьютер", "выключи пк", "выруби компьютер", "выруби пк", "выруби комп",
             "выключи комп", "выключай пк", "выключай компьютер", "выключай комп",
@@ -146,26 +156,6 @@ class CommandParser:
             if not any(w in text_low for w in ["покажи", "покатай", "пока что", "покажи-ка", "покажите"]):
                 return "shutdown"
 
-        zapret_stop_phrases = [
-            "выключи запрет", "останови запрет", "выруби запрет", "заглуши запрет",
-            "выключи обход", "останови обход", "выключи обход блокировок", "выруби обход",
-            "выключи winws", "останови winws", "выключи zapret", "останови zapret"
-        ]
-        for zsp in zapret_stop_phrases:
-            if zsp in text_low:
-                return "stop_zapret"
-
-        zapret_menu_triggers = [
-            "включи запрет", "запусти запрет", "вруби запрет", "открой запрет",
-            "включи обход", "запусти обход", "включи обход блокировок", "вруби обход",
-            "включи winws", "запусти winws", "включи zapret", "запусти zapret",
-            "смени обход", "поменяй обход", "выбери обход", "список обходов",
-            "какой обход", "какие обходы", "покажи обходы", "покажи запрет"
-        ]
-        for zmp in zapret_menu_triggers:
-            if zmp in text_low:
-                return "start_zapret"
-
         media_stop_phrases = [
             "выключи музыку", "выключи трек", "выключи музло", "выключи песню",
             "останови музыку", "стоп музыка", "заглуши музыку", "выключи плеер"
@@ -176,36 +166,11 @@ class CommandParser:
 
         brightness_words = ["яркость", "яркости", "процентов яркости"]
         if any(bw in text_low for bw in brightness_words):
-            if any(w in text_low for w in ["свет", "ламп", "люстр", "подсветк", "диод", "ночник", "комнат"]):
-                return "smart_home_brightness"
-
-        sh_on_verbs = ["включи", "зажги", "подруби", "вруби", "запусти"]
-        sh_off_verbs = ["выключи", "потуши", "погаси", "отруби", "выруби"]
-        sh_targets = ["свет", "люстру", "лампу", "бра", "ночник", "подсветку", "розетку", "гирлянду", "света", "свете",
-                      "розетки"]
-
-        if any(verb in text_low for verb in sh_on_verbs):
-            if any(target in text_low for target in sh_targets):
-                return "smart_home_on"
-
-        if any(verb in text_low for verb in sh_off_verbs):
-            if any(target in text_low for target in sh_targets):
-                return "smart_home_off"
-        scenario_triggers = [
-            "я ухожу", "ухожу из дома", "сценарий", "режим вечер",
-            "новый год", "свет по движению"
-        ]
-        if any(st in text_low for st in scenario_triggers):
-            return "smart_home_scenario"
-
-        brightness_words = ["яркость", "яркости", "процентов яркости"]
-        if any(bw in text_low for bw in brightness_words):
             if any(w in text_low for w in ["свет", "ламп", "люстр", "подсветк", "диод", "ночник", "комнат", "лент"]):
                 return "smart_home_brightness"
 
         sh_on_verbs = ["включи", "зажги", "подруби", "вруби", "запусти", "подними"]
         sh_off_verbs = ["выключи", "потуши", "погаси", "отруби", "выруби", "заглуши"]
-
         sh_targets = [
             "свет", "люстру", "люстра", "люстры", "лампу", "лампа", "лампы", "лампочку", "лампочка",
             "бра", "ночник", "подсветку", "подсветка", "розетку", "розетка", "розетки",
@@ -222,6 +187,13 @@ class CommandParser:
         if any(verb in text_low for verb in sh_off_verbs):
             if any(target in text_low for target in sh_targets):
                 return "smart_home_off"
+
+        scenario_triggers = [
+            "я ухожу", "ухожу из дома", "сценарий", "режим вечер",
+            "новый год", "свет по движению"
+        ]
+        if any(st in text_low for st in scenario_triggers):
+            return "smart_home_scenario"
 
         fullscreen_keywords = [
             "разверни", "на весь экран", "во весь экран", "полный экран",
@@ -492,6 +464,10 @@ class CommandParser:
                     intent = None
 
         if intent:
+            zapret_keywords = ["запрет", "обход", "winws", "zapret", "за прет"]
+            if intent == "shutdown" and any(zk in text_low for zk in zapret_keywords):
+                intent = "stop_zapret"
+
             action_name = self.intent_aliases.get(intent, intent)
             action_func = getattr(SystemActions, action_name, None)
             if action_func is not None:
