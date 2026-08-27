@@ -17,7 +17,6 @@ class WikipediaManager:
 
         text = re.sub(r'\([^)]*\)', '', text)
         text = re.sub(r'\[[^\]]*\]', '', text)
-        text = re.sub(r'[a-zA-Z]', '', text)
         text = re.sub(r'\s+', ' ', text)
         text = re.sub(r'\s+([.,!?;:])', r'\1', text)
         return text.strip()
@@ -43,7 +42,7 @@ class WikipediaManager:
         }
 
         try:
-            resp = self.session.get(self.api_url, params=params, timeout=1.5)
+            resp = self.session.get(self.api_url, params=params, timeout=2.0)
             if resp.status_code == 200:
                 data = resp.json()
                 pages = data.get("query", {}).get("pages", {})

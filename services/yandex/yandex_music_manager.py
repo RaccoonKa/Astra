@@ -177,10 +177,22 @@ class YandexMusicManager:
         threading.Thread(target=_async_play, daemon=True).start()
         return f"Ищу {query}"
 
+    def set_volume(self, volume: int):
+        if HAS_VLC and self.player:
+            self.player.audio_set_volume(max(0, min(100, volume)))
+
+    def duck(self, level: int = 15):
+        if HAS_VLC and self.player and self.player.is_playing():
+            self.player.audio_set_volume(level)
+
+    def unduck(self, level: int = 100):
+        if HAS_VLC and self.player and self.player.is_playing():
+            self.player.audio_set_volume(level)
+
     def play_my_wave(self):
         if not HAS_VLC:
             webbrowser.open("https://www.videolan.org/vlc/")
-            return "Для работы Яндекс Музыки нужен плеер. Открываю официальный сайт для скачивания."
+            return "Для работы +Яндекс Музыки нужен плеер. Открываю официальный сайт для скачивания."
 
         if not self._init_client():
             return False

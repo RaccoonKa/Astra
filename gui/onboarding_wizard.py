@@ -11,7 +11,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QPainter, QPen, QColor, QLinearGradient, QRadialGradient,
-    QBrush, QPainterPath, QFont, QFontDatabase
+    QBrush, QPainterPath, QFont, QFontDatabase, QIcon
 )
 
 from core.utils.config import save_config, load_config, get_user_data_path, get_resource_path
@@ -248,6 +248,9 @@ class OnboardingWizard(QDialog):
         self.config = config
         self.drag_position = QPoint()
 
+        self._init_window_icon()
+        self.setWindowTitle("Astra")
+
         font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
         font_id = QFontDatabase.addApplicationFont(font_path)
         if font_id != -1:
@@ -255,11 +258,24 @@ class OnboardingWizard(QDialog):
         else:
             self.font_family = "Arial"
 
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFixedSize(700, 610)
 
         self.init_ui()
+
+    def _init_window_icon(self):
+        ico_path = get_resource_path("assets", "icon", "ico", "icon_round.ico")
+        png_path = get_resource_path("assets", "icon", "icon_round.png")
+
+        app_icon = None
+        if os.path.exists(ico_path):
+            app_icon = QIcon(ico_path)
+        elif os.path.exists(png_path):
+            app_icon = QIcon(png_path)
+
+        if app_icon and not app_icon.isNull():
+            self.setWindowIcon(app_icon)
 
     def init_ui(self):
         self.setStyleSheet(WIZARD_STYLE)

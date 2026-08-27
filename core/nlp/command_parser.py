@@ -7,6 +7,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import re
 import threading
+import numpy as np
 from transformers.utils import logging as tf_logging
 from core.system.actions import SystemActions, zapret_manager
 from services.vpn.vpn_manager import VpnManager
@@ -66,7 +67,8 @@ class CommandParser:
             "smart_home_on": "smart_home_on",
             "smart_home_off": "smart_home_off",
             "smart_home_brightness": "smart_home_brightness",
-            "smart_home_scenario": "smart_home_scenario"
+            "smart_home_scenario": "smart_home_scenario",
+            "open_discord": "open_discord"
         }
 
         self.nlu = None
@@ -82,6 +84,26 @@ class CommandParser:
             print(f"[PARSER ERROR]: Не удалось загрузить JointNLU: {e}")
 
         self.is_ready = True
+
+    def _detect_whisper(self, audio_data):
+        if not audio_data or len(audio_data) < 3200:
+            return False
+        try:
+            samples = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
+            if np.max(np.abs(samples)) < 180:
+                return False
+
+            zcr = np.mean(np.abs(np.diff(np.sign(samples)))) / 2.0
+            fft_vals = np.abs(np.fft.rfft(samples))
+            freqs = np.fft.rfftfreq(len(samples), 1.0 / 16000.0)
+
+            low_energy = np.sum(fft_vals[(freqs >= 80) & (freqs < 700)] ** 2) + 1e-6
+            high_energy = np.sum(fft_vals[(freqs >= 1400) & (freqs < 6000)] ** 2) + 1e-6
+            ratio = high_energy / low_energy
+
+            return bool(ratio > 1.65 and zcr > 0.11)
+        except Exception:
+            return False
 
     def _extract_zapret_number(self, text):
         text_clean = text.lower().strip()
@@ -118,6 +140,16 @@ class CommandParser:
         for rt in rest_triggers:
             if rt in text_low:
                 return "mode_rest"
+
+        discord_triggers = [
+            "дискорд", "дискорда", "дискорду", "дискорде", "дискордом",
+            "discord", "дискорт", "дискорта", "эскорт", "эскорта",
+            "эскорту", "эскорте", "эскортом", "диск орд", "диск орт", "дискор"
+        ]
+        if any(dt in text_low for dt in discord_triggers):
+            app_verbs = ["включ", "открой", "запуст", "вруб", "стартуй", "подруби", "зайди", "покажи"]
+            if any(v in text_low for v in app_verbs) or len(words) <= 2:
+                return "open_discord"
 
         has_generic_vpn = vpn_manager.is_generic_vpn_mention(text_low)
         parsed_vpn = vpn_manager.parse_vpn_name(text_low)
@@ -319,6 +351,7 @@ class CommandParser:
             return ""
 
         text_low = text.lower().strip() if text else ""
+        is_whisper = self._detect_whisper(audio_data) if is_voice else False
 
         emotion, emo_conf = self.emotion_classifier.predict(audio_data)
         self.last_emotion = emotion
@@ -333,10 +366,10 @@ class CommandParser:
             if file_text.strip():
                 prompt = text if text else "Изучи этот документ и расскажи кратко, о чем он."
                 ans = self.llm.ask_with_context(prompt, file_text)
-                return {"chat": ans, "voice": ans, "emotion": emotion}
+                return {"chat": ans, "voice": ans, "emotion": emotion, "is_whisper": is_whisper}
             else:
                 msg = "Не удалось распознать текст в этом файле."
-                return {"chat": msg, "voice": msg, "emotion": emotion}
+                return {"chat": msg, "voice": msg, "emotion": emotion, "is_whisper": is_whisper}
 
         if self.waiting_for_zapret:
             num = self._extract_zapret_number(text_low)
@@ -346,19 +379,22 @@ class CommandParser:
                 return {
                     "chat": res_text,
                     "voice": res_text,
-                    "emotion": emotion
+                    "emotion": emotion,
+                    "is_whisper": is_whisper
                 }
             if any(w in text_low for w in ["отмена", "забудь", "не надо", "назад", "хватит", "стоп"]):
                 self.waiting_for_zapret = False
                 return {
                     "chat": "Выбор варианта обхода отменён.",
                     "voice": "Отменила выбор обхода.",
-                    "emotion": emotion
+                    "emotion": emotion,
+                    "is_whisper": is_whisper
                 }
             return {
                 "chat": "Пожалуйста, назови или введи номер от 1 до 20 (или напиши 'отмена').",
                 "voice": "Скажи или введи число от одного до двадцати.",
-                "emotion": emotion
+                "emotion": emotion,
+                "is_whisper": is_whisper
             }
 
         if self.waiting_for_vpn:
@@ -367,7 +403,8 @@ class CommandParser:
                 return {
                     "chat": "" if is_voice else "Выбор впн отменён.",
                     "voice": "Отменила выбор впн.",
-                    "emotion": emotion
+                    "emotion": emotion,
+                    "is_whisper": is_whisper
                 }
             vpn_key = vpn_manager.parse_vpn_name(text_low)
             if vpn_key != "none":
@@ -377,12 +414,14 @@ class CommandParser:
                 return {
                     "chat": "" if is_voice else f"Запомнила {vpn_key.title()}! {res_text}",
                     "voice": f"Запомнила! {res_text}",
-                    "emotion": emotion
+                    "emotion": emotion,
+                    "is_whisper": is_whisper
                 }
             return {
                 "chat": "Не распознала клиент. Назови или напиши: Сота, Хапп, Витурей или Ваергард (или 'отмена').",
                 "voice": "Назови приложение: Сота, Хапп, Витурей или Ваергард.",
-                "emotion": emotion
+                "emotion": emotion,
+                "is_whisper": is_whisper
             }
 
         num_direct = self._extract_zapret_number(text_low)
@@ -391,7 +430,8 @@ class CommandParser:
             return {
                 "chat": res_text,
                 "voice": res_text,
-                "emotion": emotion
+                "emotion": emotion,
+                "is_whisper": is_whisper
             }
 
         rule_intent = self._check_rules(text)
@@ -401,19 +441,20 @@ class CommandParser:
             res = SystemActions.start_zapret(text)
             if isinstance(res, dict):
                 res["emotion"] = emotion
+                res["is_whisper"] = is_whisper
                 return res
-            return {"chat": str(res), "voice": str(res), "emotion": emotion}
+            return {"chat": str(res), "voice": str(res), "emotion": emotion, "is_whisper": is_whisper}
 
         if rule_intent == "stop_zapret":
             self.waiting_for_zapret = False
             res = SystemActions.stop_zapret(text)
-            return {"chat": str(res), "voice": str(res), "emotion": emotion}
+            return {"chat": str(res), "voice": str(res), "emotion": emotion, "is_whisper": is_whisper}
 
         if rule_intent == "start_vpn":
             explicit_vpn = vpn_manager.parse_vpn_name(text_low)
             if explicit_vpn != "none":
                 res = vpn_manager.connect(explicit_vpn)
-                return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion}
+                return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion, "is_whisper": is_whisper}
 
             configured = vpn_manager.get_configured_vpn()
             if configured == "none":
@@ -421,31 +462,33 @@ class CommandParser:
                 return {
                     "chat": "Какое приложение для ВПН ты используешь? (Сота, Хапп, Витурей или Ваергард)",
                     "voice": "Какое приложение для ВПН ты используешь?",
-                    "emotion": emotion
+                    "emotion": emotion,
+                    "is_whisper": is_whisper
                 }
             res = vpn_manager.connect(configured)
-            return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion}
+            return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion, "is_whisper": is_whisper}
 
         if rule_intent == "stop_vpn":
             explicit_vpn = vpn_manager.parse_vpn_name(text_low)
             if explicit_vpn != "none":
                 res = vpn_manager.disconnect(explicit_vpn)
-                return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion}
+                return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion, "is_whisper": is_whisper}
 
             configured = vpn_manager.get_configured_vpn()
             if configured == "none" and not vpn_manager.last_active_vpn:
                 return {
                     "chat": "" if is_voice else "ВПН не выбран в настройках.",
                     "voice": "ВПН не выбран в настройках.",
-                    "emotion": emotion
+                    "emotion": emotion,
+                    "is_whisper": is_whisper
                 }
             res = vpn_manager.disconnect()
-            return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion}
+            return {"chat": "" if is_voice else res, "voice": res, "emotion": emotion, "is_whisper": is_whisper}
 
         if rule_intent == "chat":
             prompt_with_emotion = f"[{emo_desc}] {text}" if emotion in ["sad", "happy"] else text
             ans = self.llm.ask(prompt_with_emotion)
-            return {"chat": ans, "voice": ans, "emotion": emotion}
+            return {"chat": ans, "voice": ans, "emotion": emotion, "is_whisper": is_whisper}
 
         if not self.is_ready:
             self.loader_thread.join()
@@ -487,9 +530,9 @@ class CommandParser:
                         res_str = f"{res_str}! Рада твоему классному настроению ✨"
 
                     if intent in ["start_vpn", "stop_vpn"]:
-                        return {"chat": "" if is_voice else res_str, "voice": res_str, "emotion": emotion}
-                    return {"chat": res_str, "voice": res_str, "emotion": emotion}
+                        return {"chat": "" if is_voice else res_str, "voice": res_str, "emotion": emotion, "is_whisper": is_whisper}
+                    return {"chat": res_str, "voice": res_str, "emotion": emotion, "is_whisper": is_whisper}
 
         prompt_with_emotion = f"[Интонация пользователя: {emo_desc}] {text}" if emotion in ["sad", "happy"] else text
         ans = self.llm.ask(prompt_with_emotion)
-        return {"chat": ans, "voice": ans, "emotion": emotion}
+        return {"chat": ans, "voice": ans, "emotion": emotion, "is_whisper": is_whisper}

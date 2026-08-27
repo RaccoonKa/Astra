@@ -6,6 +6,7 @@ import sounddevice as sd
 import numpy as np
 from PyQt6.QtCore import QThread, pyqtSignal
 from core.utils.config import get_resource_path, load_config
+from core.system.actions import ym_manager
 
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
@@ -13,6 +14,79 @@ else:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_MODEL_PATH = get_resource_path("optimized_models", "silero_tts", "v4_ru.pt")
+
+BRAND_DICTIONARY = {
+    "spacex": "Сп+ейс Икс",
+    "tesla": "Т+эсла",
+    "apple": "+Эппл",
+    "google": "Г+угл",
+    "samsung": "Самс+унг",
+    "huawei": "Хуав+эй",
+    "honor": "+Онор",
+    "xiaomi": "Сяом+и",
+    "x": "+Икс",
+    "microsoft": "М+айкрософт",
+    "amazon": "Амаз+он",
+    "meta": "М+ета",
+    "facebook": "Ф+ейсбук",
+    "twitter": "Тв+иттер",
+    "instagram": "Инстагр+ам",
+    "telegram": "Телегр+ам",
+    "discord": "Д+искорд",
+    "youtube": "Ют+уб",
+    "nvidia": "Энв+идиа",
+    "amd": "Эй Эм Д+и",
+    "intel": "+Интел",
+    "sony": "С+они",
+    "samsung": "С+амсунг",
+    "openai": "+Оупен Эй +Ай",
+    "windows": "В+индоус",
+    "linux": "Л+инукс",
+    "steam": "Ст+им",
+    "valve": "В+алв",
+    "uber": "+Убер",
+    "spotify": "Спотиф+ай",
+    "netflix": "Н+етфликс",
+    "chatgpt": "Чат Джи Пи Т+и",
+    "yandex": "+Яндекс",
+    "vk": "Вэ К+а",
+    "bmw": "Бэ Эм В+э",
+    "audi": "+Ауди",
+    "mercedes": "Мерсед+ес"
+}
+
+
+def latin_to_cyrillic(text: str) -> str:
+    if not text:
+        return ""
+
+    def replace_word(match):
+        word = match.group(0)
+        low_word = word.lower()
+        if low_word in BRAND_DICTIONARY:
+            return BRAND_DICTIONARY[low_word]
+
+        w = low_word
+        replacements = [
+            ("sh", "ш"), ("ch", "ч"), ("th", "т"), ("ph", "ф"),
+            ("zh", "ж"), ("kh", "х"), ("ts", "ц"), ("ee", "и"),
+            ("oo", "у"), ("ea", "и"), ("ck", "к"), ("qu", "кв"),
+            ("ya", "я"), ("yo", "ё"), ("yu", "ю"), ("x", "кс"),
+            ("w", "в"), ("j", "дж"), ("c", "к"), ("q", "к")
+        ]
+        for lat, cyr in replacements:
+            w = w.replace(lat, cyr)
+
+        char_map = {
+            'a': 'а', 'b': 'б', 'v': 'в', 'g': 'г', 'd': 'д', 'e': 'е',
+            'z': 'з', 'i': 'и', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н',
+            'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у',
+            'f': 'ф', 'h': 'х', 'y': 'и'
+        }
+        res = "".join(char_map.get(ch, ch) for ch in w)
+        return res
+
+    return re.sub(r'[a-zA-Z]+', replace_word, text)
 
 
 class TTSThread(QThread):
@@ -32,9 +106,10 @@ class TTSThread(QThread):
         self._stopped = False
         self._is_warmup = False
         self._play_cached_flag = False
+        self.is_whisper = False
         self.greeting_to_precache = ""
         self.cached_greeting_audio = None
-        self.warmup_text = "Астра"
+        self.warmup_text = "Голосовой ассистент готов к работе."
 
     def _init_model(self):
         if self.model is None and os.path.exists(self.model_path):
@@ -46,7 +121,24 @@ class TTSThread(QThread):
             except Exception as e:
                 print(f"[TTS Init Error]: {e}")
 
-    def _process_audio_level(self, audio_np):
+    def _apply_whisper_dsp(self, audio_np):
+        try:
+            from scipy.signal import butter, sosfilt
+            nyq = 0.5 * self.sample_rate
+
+            hp_sos = butter(2, 380.0 / nyq, btype='high', output='sos')
+            audio_hp = sosfilt(hp_sos, audio_np)
+
+            bp_sos = butter(2, [2200.0 / nyq, 7500.0 / nyq], btype='band', output='sos')
+            air = sosfilt(bp_sos, audio_hp)
+
+            whisper_mix = audio_hp * 0.40 + air * 0.60
+            whisper_mix = np.tanh(whisper_mix * 1.5) * 0.75
+            return whisper_mix.astype(np.float32)
+        except Exception:
+            return (audio_np * 0.40).astype(np.float32)
+
+    def _process_audio_level(self, audio_np, is_whisper=False):
         peak = np.max(np.abs(audio_np))
         if peak > 0.001:
             audio_np = audio_np / peak
@@ -54,6 +146,9 @@ class TTSThread(QThread):
         cfg = load_config()
         vol_percent = cfg.get("voice_volume", 100)
         vol_factor = max(0.0, min(1.0, vol_percent / 100.0))
+
+        if is_whisper:
+            vol_factor *= 0.42
 
         return (audio_np * vol_factor).astype(np.float32)
 
@@ -77,6 +172,7 @@ class TTSThread(QThread):
         )
         cleaned = emoji_pattern.sub("", text)
         cleaned = re.sub(r'[:;=]-?[()DOPpP|/\\]|<3', '', cleaned)
+        cleaned = latin_to_cyrillic(cleaned)
         return re.sub(r'\s+', ' ', cleaned).strip()
 
     def stop(self):
@@ -85,6 +181,7 @@ class TTSThread(QThread):
             sd.stop()
         except Exception:
             pass
+        ym_manager.unduck(100)
         if self.isRunning():
             self.wait(200)
 
@@ -108,12 +205,13 @@ class TTSThread(QThread):
         else:
             self.say(self.greeting_to_precache if self.greeting_to_precache else "Привет!")
 
-    def say(self, text, speaker='kseniya'):
+    def say(self, text, speaker='kseniya', is_whisper=False):
         self.stop()
         self._is_warmup = False
         self._play_cached_flag = False
         self.text_to_speak = text
         self.speaker = speaker
+        self.is_whisper = is_whisper
         self.start()
 
     def run(self):
@@ -140,7 +238,7 @@ class TTSThread(QThread):
                             speaker=self.speaker,
                             sample_rate=self.sample_rate
                         )
-                    audio_np = self._process_audio_level(audio.numpy())
+                    audio_np = self._process_audio_level(audio.numpy(), is_whisper=False)
                     padding = np.zeros(int(self.sample_rate * 0.2), dtype=np.float32)
                     self.cached_greeting_audio = np.concatenate([audio_np, padding])
 
@@ -150,6 +248,7 @@ class TTSThread(QThread):
             if self._play_cached_flag:
                 self._play_cached_flag = False
                 if self.cached_greeting_audio is not None and not self._stopped:
+                    ym_manager.duck(15)
                     self.speaking_started.emit()
                     sd.play(self.cached_greeting_audio, self.sample_rate)
                     while sd.get_stream() and sd.get_stream().active:
@@ -173,10 +272,16 @@ class TTSThread(QThread):
             if self._stopped:
                 return
 
-            audio_np = self._process_audio_level(audio.numpy())
+            raw_audio = audio.numpy()
+            if self.is_whisper:
+                raw_audio = self._apply_whisper_dsp(raw_audio)
+
+            audio_np = self._process_audio_level(raw_audio, is_whisper=self.is_whisper)
             padding = np.zeros(int(self.sample_rate * 0.2), dtype=np.float32)
             audio_padded = np.concatenate([audio_np, padding])
 
+            duck_level = 8 if self.is_whisper else 15
+            ym_manager.duck(duck_level)
             self.speaking_started.emit()
             sd.play(audio_padded, self.sample_rate)
 
@@ -193,4 +298,5 @@ class TTSThread(QThread):
                 self.warmup_finished.emit()
         finally:
             if not self._is_warmup:
+                ym_manager.unduck(100)
                 self.speaking_finished.emit()

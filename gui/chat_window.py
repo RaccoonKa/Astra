@@ -1,10 +1,12 @@
 import os
 import math
+import time
 import random
 import atexit
 import warnings
 import threading
 import numpy as np
+import psutil
 from services.telegram.notifier import send_security_alert
 from services.telegram.telegram_bot import TelegramBotThread
 from PyQt6.QtWidgets import (
@@ -613,12 +615,13 @@ class VolumeDucker:
             CoInitialize()
             self.saved_volumes.clear()
             sessions = AudioUtilities.GetAllSessions()
+            current_pid = os.getpid()
 
             for session in sessions:
                 process = session.Process
                 if process:
                     name = process.name().lower()
-                    if "python" in name or "pycharm" in name:
+                    if process.pid == current_pid or "astra" in name or "python" in name or "pycharm" in name:
                         continue
 
                     volume = session._ctl.QueryInterface(ISimpleAudioVolume)
@@ -679,8 +682,17 @@ class MainWindow(QWidget):
         self.vision_thread = None
         self.presence_manager = None
 
+        self.absence_start_time = None
+        self.warned_battery_50 = False
+        self.warned_battery_25 = False
+        self.warned_battery_tg_30 = False
+
         self.init_ui()
         self.init_audio()
+
+        self.battery_timer = QTimer(self)
+        self.battery_timer.timeout.connect(self.check_battery_status)
+        self.battery_timer.start(45000)
 
         cfg_modules = self.config.get("modules", {}) if isinstance(self.config, dict) else {}
         if cfg_modules.get("vision", False):
@@ -828,6 +840,94 @@ class MainWindow(QWidget):
         self.settings_anim_group = QParallelAnimationGroup(self)
         self.chat_anim_group = QParallelAnimationGroup(self)
 
+    def check_battery_status(self):
+        try:
+            battery = psutil.sensors_battery()
+            if battery is None:
+                return
+
+            if battery.power_plugged:
+                self.warned_battery_50 = False
+                self.warned_battery_25 = False
+                self.warned_battery_tg_30 = False
+                return
+
+            percent = battery.percent
+
+            if percent <= 30 and not getattr(self, 'warned_battery_tg_30', False):
+                self.warned_battery_tg_30 = True
+                from services.telegram.notifier import send_telegram_notification
+                send_telegram_notification(
+                    f"🔋 **Внимание!** Батарея ноутбука разрядилась до **{percent}%**! Подключи зарядное устройство, чтобы не потерять работу."
+                )
+
+            if percent <= 25 and not self.warned_battery_25:
+                self.warned_battery_25 = True
+                self.warned_battery_50 = True
+                msg = "Осталось всего двадцать пять процентов заряда. Подключи ноутбук к розетке, чтобы он не выключился!"
+                self.chat_history.append(f"Астра: {msg}\n")
+                self.speak_reply(msg)
+            elif percent <= 50 and not self.warned_battery_50:
+                self.warned_battery_50 = True
+                msg = "Батарея разрядилась до половины. Осталось пятьдесят процентов."
+                self.chat_history.append(f"Астра: {msg}\n")
+                self.speak_reply(msg)
+            elif percent > 55:
+                self.warned_battery_50 = False
+                self.warned_battery_25 = False
+                self.warned_battery_tg_30 = False
+            elif percent > 35:
+                self.warned_battery_tg_30 = False
+            elif percent > 30:
+                self.warned_battery_25 = False
+        except Exception:
+            pass
+
+    def on_user_left(self):
+        self.absence_start_time = time.time()
+        SystemActions.lock_screen()
+
+    def on_user_returned(self):
+        user_name = "друг"
+        if isinstance(self.config, dict):
+            user_name = self.config.get("user_name", "друг")
+
+        elapsed = (time.time() - self.absence_start_time) if self.absence_start_time else 0
+        self.absence_start_time = None
+
+        if elapsed < 120:
+            msg = random.choice([
+                f"Ой, ты уже здесь! А я только плед поудобнее поправила. 🥰 Что делаем?",
+                "Уже тут? Твоя суперспос+обность — решать дела за секунды! 😧",
+                "Уже тут? Как я рада! А то без тебя здесь скучно. 🤗",
+                f"Ты летаешь быстрее ветра, {user_name}! 😶‍🌫️ Я готова продолжать.",
+                "А я только налила воображаемый чай... Ну ладно, продолжаем! 🥰",
+                "Не можешь без меня долго? 😊💛",
+                "А я только хотела устроить цифровую си+есту... ✨ Вся во внимании!"
+            ])
+        elif elapsed < 1800:
+            msg = random.choice([
+                "Две минуты — мало, тридцать — много, а сейчас — в самый раз! ☺️ Что на очереди?",
+                f"Маленький перерыв — это полезно, {user_name}. Рада, что ты снова со мной! 😊",
+                "Ты снова здесь! А я тут как раз считала облака за ок+ошком ☁️. Что делаем дальше?"
+            ])
+        elif elapsed < 7200:
+            msg = random.choice([
+                "О, знакомые всё лица! Вся во внимании! 🥰",
+                "Рада видеть тебя в строю! Перерыв получился отличным, пора за дело. 😌",
+                "Ура, ты снова здесь! Соскучиться я успела, но главное — ты снова на связи. 🤗💛"
+            ])
+        else:
+            msg = random.choice([
+                "Какая долгая разлука! Я очень сильно по тебе соскучилась. 🥺💛 Вся во внимании!",
+                "Привет-привет! Время без тебя тянулось очень долго! 🥺💛",
+                "Ого, целая вечность прошла! Я уже хотела писать тебе письмо в реальный мир. 😉💛",
+                "Привет! Мой датчик радости сейчас зашкаливает. Больше так надолго не пропадай! 🥺💛"
+            ])
+
+        self.chat_history.append(f"Астра: {msg}\n")
+        self.speak_reply(msg)
+
     def on_deep_drowsiness(self):
         cfg = self.config if isinstance(self.config, dict) else (
             SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
@@ -937,12 +1037,8 @@ class MainWindow(QWidget):
         self.vision_thread.deep_drowsiness_signal.connect(self.on_deep_drowsiness)
         self.vision_thread.frequent_blinking_signal.connect(self.on_frequent_blinking)
 
-        user_name = "друг"
-        if isinstance(self.config, dict):
-            user_name = self.config.get("user_name", "друг")
-
-        self.presence_manager.user_left.connect(SystemActions.lock_screen)
-        self.presence_manager.user_returned.connect(lambda: self.tts_thread.say(f"С возвращением, {user_name}!"))
+        self.presence_manager.user_left.connect(self.on_user_left)
+        self.presence_manager.user_returned.connect(self.on_user_returned)
         self.presence_manager.unknown_user_detected.connect(self.on_unknown_user)
 
         self.vision_thread.start()
@@ -989,13 +1085,14 @@ class MainWindow(QWidget):
         if gesture_name == "open_palm":
             SystemActions.media_play_pause()
         elif gesture_name == "fist":
+            self.absence_start_time = time.time()
             SystemActions.lock_screen()
         elif gesture_name == "pointing":
             SystemActions.media_next_track()
 
-    def speak_reply(self, text):
+    def speak_reply(self, text, is_whisper=False):
         if text:
-            self.tts_thread.say(text)
+            self.tts_thread.say(text, is_whisper=is_whisper)
 
     def on_speech_recognized(self, text, audio_data=None):
         if not self.ui_revealed:
@@ -1010,16 +1107,24 @@ class MainWindow(QWidget):
 
         self.chat_history.append(f"Вы (голос): {text}")
 
+        text_low = text.lower()
+        if any(w in text_low for w in ["заблокируй", "залочь", "заблокировать", "залочить"]):
+            self.absence_start_time = time.time()
+            if self.presence_manager:
+                self.presence_manager.is_present = False
+
         self.voice_worker = CommandWorker(self.command_parser, text, audio_data=audio_data, is_voice=True, parent=self)
         self.voice_worker.result_ready.connect(self.on_voice_command_finished)
         self.voice_worker.start()
 
     def on_voice_command_finished(self, response):
         if response:
+            is_whisper = False
             if isinstance(response, dict):
                 chat_text = response.get("chat", "")
                 voice_text = response.get("voice", "")
                 emotion = response.get("emotion", "neutral")
+                is_whisper = response.get("is_whisper", False)
             else:
                 chat_text = voice_text = str(response)
                 emotion = getattr(self.command_parser, "last_emotion", "neutral")
@@ -1034,7 +1139,7 @@ class MainWindow(QWidget):
                         self.toggle_chat()
 
             if voice_text:
-                self.speak_reply(voice_text)
+                self.speak_reply(voice_text, is_whisper=is_whisper)
         else:
             emotion = getattr(self.command_parser, "last_emotion", "neutral")
             self.left_panel.set_emotion(emotion)
@@ -1054,6 +1159,12 @@ class MainWindow(QWidget):
                 self.chat_history.append(f"Вы: {user_msg} [📎 {filename}]")
             else:
                 self.chat_history.append(f"Вы: {user_msg}")
+
+            text_low = text.lower()
+            if any(w in text_low for w in ["заблокируй", "залочь", "заблокировать", "залочить"]):
+                self.absence_start_time = time.time()
+                if self.presence_manager:
+                    self.presence_manager.is_present = False
 
             self.input_field.clear()
             self.input_field.setEnabled(False)
@@ -1080,7 +1191,7 @@ class MainWindow(QWidget):
             if chat_text:
                 self.chat_history.append(f"Астра: {chat_text}\n")
             if voice_text:
-                self.speak_reply(voice_text)
+                self.speak_reply(voice_text, is_whisper=False)
 
     def on_stt_error(self, err):
         pass
@@ -1092,6 +1203,8 @@ class MainWindow(QWidget):
     def shutdown(self):
         if hasattr(self, 'ducker'):
             self.ducker.restore()
+        if hasattr(self, 'battery_timer') and self.battery_timer.isActive():
+            self.battery_timer.stop()
         if hasattr(self, 'audio_worker') and self.audio_worker.isRunning():
             self.audio_worker.stop()
         if hasattr(self, 'tts_thread') and self.tts_thread.isRunning():

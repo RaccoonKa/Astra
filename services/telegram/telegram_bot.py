@@ -52,7 +52,7 @@ main_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="Скриншот"), KeyboardButton(text="Веб-камера")],
         [KeyboardButton(text="Статус ПК"), KeyboardButton(text="Заблокировать ПК")],
-        [KeyboardButton(text="Выключить ПК")]
+        [KeyboardButton(text="Перезагрузить ПК"), KeyboardButton(text="Выключить ПК")]
     ],
     resize_keyboard=True
 )
@@ -283,6 +283,51 @@ async def cmd_say(message: types.Message, command: CommandObject):
     await message.answer(f"📢 Сказала на компьютере: «{phrase}»")
 
 
+@dp.message(Command("get"))
+async def cmd_get_file(message: types.Message, command: CommandObject):
+    if message.from_user.id != get_admin_id():
+        return
+    query = command.args
+    if not query:
+        await message.answer("Укажи имя файла или полный путь.\nНапример: `/get document.pdf` или `/get C:\\Games\\file.txt`", parse_mode="Markdown")
+        return
+
+    raw_query = query.strip().strip('"').strip("'")
+    target_path = Path(raw_query)
+
+    if not target_path.is_absolute() or not target_path.exists():
+        search_dirs = [
+            Path.home() / "Downloads",
+            Path.home() / "Desktop",
+            Path.home() / "Documents",
+            ROOT_DIR
+        ]
+        found = None
+        for s_dir in search_dirs:
+            cand = s_dir / raw_query
+            if cand.exists() and cand.is_file():
+                found = cand
+                break
+        if found:
+            target_path = found
+
+    if not target_path.exists() or not target_path.is_file():
+        await message.answer(f"❌ Файл `{raw_query}` не найден на компьютере.", parse_mode="Markdown")
+        return
+
+    file_size_mb = target_path.stat().st_size / (1024 * 1024)
+    if file_size_mb > 49.5:
+        await message.answer(f"⚠️ Файл слишком большой ({file_size_mb:.1f} МБ). Максимальный размер файла — 50 МБ.")
+        return
+
+    try:
+        input_file = FSInputFile(str(target_path))
+        await message.answer_document(input_file, caption=f"📤 Файл с ПК: `{target_path.name}`", parse_mode="Markdown")
+    except Exception as e:
+        print(f"[Telegram Get File Error]: {e}")
+        await message.answer("Не удалось отправить файл 🥺")
+
+
 @dp.callback_query(F.data == "security_lock")
 async def handle_security_lock(callback: types.CallbackQuery):
     if callback.from_user.id != get_admin_id():
@@ -371,6 +416,17 @@ async def handle_lock(message: types.Message):
         await message.answer(ERROR_UNREACHABLE_MSG)
 
 
+@dp.message(F.text == "Перезагрузить ПК")
+async def handle_restart(message: types.Message):
+    if message.from_user.id != get_admin_id():
+        return
+    try:
+        await message.answer("Перезагружаю компьютер... 🔄")
+        subprocess.run("shutdown /r /t 5", shell=True)
+    except Exception:
+        await message.answer(ERROR_UNREACHABLE_MSG)
+
+
 @dp.message(F.text == "Выключить ПК")
 async def handle_off(message: types.Message):
     if message.from_user.id != get_admin_id():
@@ -380,6 +436,29 @@ async def handle_off(message: types.Message):
         subprocess.run("shutdown /s /t 5", shell=True)
     except Exception:
         await message.answer(ERROR_UNREACHABLE_MSG)
+
+
+@dp.message(F.document)
+async def handle_document_upload(message: types.Message, bot: Bot):
+    if message.from_user.id != get_admin_id():
+        return
+
+    doc = message.document
+    if not doc:
+        return
+
+    try:
+        downloads_dir = Path.home() / "Downloads"
+        downloads_dir.mkdir(parents=True, exist_ok=True)
+        file_name = doc.file_name or f"file_{int(time.time())}"
+        dest_path = downloads_dir / file_name
+
+        file = await bot.get_file(doc.file_id)
+        await bot.download_file(file.file_path, destination=dest_path)
+        await message.answer(f"📥 Файл **{file_name}** сохранён в папку `Загрузки`!", parse_mode="Markdown")
+    except Exception as e:
+        print(f"[Telegram File Upload Error]: {e}")
+        await message.answer("Не удалось сохранить файл на ПК 🥺")
 
 
 @dp.message(F.voice)
@@ -414,7 +493,7 @@ async def handle_voice_message(message: types.Message, bot: Bot):
         else:
             chat_text = voice_text = str(response)
 
-        await message.answer(f"🎤 *Распознано:* {recognized_text}\n\n💬 {chat_text}", parse_mode="Markdown")
+        await message.answer(f"*Распознано:* {recognized_text}\n\n💬 {chat_text}", parse_mode="Markdown")
 
         has_voice = await loop.run_in_executor(None, synthesize_voice_file, voice_text, reply_voice_path)
         if has_voice and os.path.exists(reply_voice_path):

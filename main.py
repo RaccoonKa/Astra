@@ -1,22 +1,28 @@
 import inspect
 
-
 _orig_findsource = inspect.findsource
+
+
 def _safe_findsource(obj):
     try:
         return _orig_findsource(obj)
     except Exception:
         return (["\n"], 0)
+
+
 inspect.findsource = _safe_findsource
 
 _orig_getsource = inspect.getsource
+
+
 def _safe_getsource(obj):
     try:
         return _orig_getsource(obj)
     except Exception:
         return "\n"
-inspect.getsource = _safe_getsource
 
+
+inspect.getsource = _safe_getsource
 
 import os
 import sys
@@ -75,7 +81,7 @@ def apply_native_windows_icon(hwnd, icon_path):
 
 
 def main():
-    myappid = 'svetozar.astra.voiceassistant.1.0'
+    myappid = 'svetozar.astra.voiceassistant.1.2.0'
     try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     except Exception:
@@ -95,6 +101,12 @@ def main():
     is_first_run = config.get("first_run", True) and not config.get("is_configured", False)
     if is_first_run:
         wizard = OnboardingWizard(config)
+        wizard.setWindowTitle("Astra")
+        wizard.setWindowIcon(app_icon)
+
+        wizard_hwnd = int(wizard.winId())
+        apply_native_windows_icon(wizard_hwnd, ico_path)
+
         wizard.exec()
         config = load_config()
 

@@ -74,3 +74,34 @@ def _send_photo_worker(frame_or_path, caption: str, with_keyboard: bool = True):
 
 def send_security_alert(frame_or_path=None, caption="⚠️ Замечен посторонний пользователь! Заблокировать ПК?"):
     threading.Thread(target=_send_photo_worker, args=(frame_or_path, caption, True), daemon=True).start()
+
+
+def send_telegram_notification(text: str):
+    def _worker():
+        try:
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            config_path = base_dir / "personal_data" / "configs" / "config.json"
+
+            if not config_path.exists():
+                return
+
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+
+            token = cfg.get("api_keys", {}).get("telegram_token", "")
+            admin_id = cfg.get("api_keys", {}).get("telegram_admin_id", 0)
+
+            if not token or not admin_id:
+                return
+
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            payload = {
+                "chat_id": admin_id,
+                "text": text,
+                "parse_mode": "Markdown"
+            }
+            requests.post(url, json=payload, timeout=10)
+        except Exception as e:
+            print(f"[Telegram Notification Error]: {e}")
+
+    threading.Thread(target=_worker, daemon=True).start()

@@ -3,11 +3,13 @@ import sys
 import json
 import queue
 import time
+import numpy as np
 import sounddevice as sd
 import vosk
 from PyQt6.QtCore import QThread, pyqtSignal
 from core.nlp.asr_corrector import ASRCorrector
 from core.utils.config import load_config, get_resource_path
+from core.system.actions import ym_manager
 
 
 class STTThread(QThread):
@@ -22,7 +24,6 @@ class STTThread(QThread):
         else:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        self.model_path = model_path if model_path else os.path.join(base_dir, "optimized_models", "model_vosk")
         self._running = True
         self.samplerate = 16000
         self.audio_queue = queue.Queue()
@@ -47,7 +48,17 @@ class STTThread(QThread):
                 self.audio_queue.queue.clear()
 
     def _audio_callback(self, indata, frames, time_info, status):
-        self.audio_queue.put(bytes(indata))
+        audio_data = np.frombuffer(indata, dtype=np.int16).astype(np.float32)
+        peak = np.max(np.abs(audio_data))
+
+        if peak > 150.0:
+            target_peak = 22000.0
+            gain = min(3.5, max(1.0, target_peak / peak))
+            boosted = np.clip(audio_data * gain, -32768, 32767).astype(np.int16)
+        else:
+            boosted = audio_data.astype(np.int16)
+
+        self.audio_queue.put(boosted.tobytes())
 
     def _contains_wake_word(self, text):
         words = text.lower().split()
@@ -101,11 +112,13 @@ class STTThread(QThread):
                     active_start_time = time.time()
                     recognizer.Reset()
                     utterance_buffer.clear()
+                    ym_manager.duck(15)
                     self.listening_state_changed.emit(True)
 
                 if active_mode and (time.time() - active_start_time > 4.5):
                     active_mode = False
                     utterance_buffer.clear()
+                    ym_manager.unduck(100)
                     self.listening_state_changed.emit(False)
 
                 try:
@@ -130,6 +143,7 @@ class STTThread(QThread):
                         words = text.split()
                         raw_command = " ".join(words[wake_idx + 1:]).strip()
                         if raw_command:
+                            ym_manager.duck(15)
                             command = self.corrector.correct(raw_command)
                             self.text_recognized.emit(command, phrase_audio)
                             active_mode = False
@@ -138,6 +152,7 @@ class STTThread(QThread):
                             active_mode = True
                             active_start_time = time.time()
                             recognizer.Reset()
+                            ym_manager.duck(15)
                             self.listening_state_changed.emit(True)
                     elif active_mode:
                         command = self.corrector.correct(text)
@@ -147,4 +162,5 @@ class STTThread(QThread):
 
     def stop_thread(self):
         self._running = False
+        ym_manager.unduck(100)
         self.wait()

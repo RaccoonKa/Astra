@@ -20,17 +20,17 @@ class SystemTray(QSystemTrayIcon):
         super().__init__(tray_icon, parent=window)
         self.window = window
         self.app = app
-        self.setToolTip("Астра")
+        self.setToolTip("Astra")
         self.init_menu()
 
     def init_menu(self):
         menu = QMenu()
 
-        show_action = QAction("Открыть окно", self)
+        show_action = QAction("Open window", self)
         show_action.triggered.connect(self.show_window)
         menu.addAction(show_action)
 
-        quit_action = QAction("Выход", self)
+        quit_action = QAction("Exit", self)
         quit_action.triggered.connect(self.app.quit)
         menu.addAction(quit_action)
 
