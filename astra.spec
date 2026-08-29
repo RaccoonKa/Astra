@@ -39,6 +39,7 @@ if os.path.exists(google_creds_path):
 
 datas += collect_data_files('transformers')
 datas += collect_data_files('torch')
+datas += collect_data_files('certifi')
 try:
     datas += collect_data_files('face_recognition_models')
 except Exception:
@@ -52,10 +53,20 @@ hiddenimports += [
     'scipy.signal',
     'sounddevice',
     'soundfile',
+    'soundcard',
+    'cffi',
     'torch',
     'comtypes',
     'pycaw',
     'aiogram',
+    'aiohttp',
+    'certifi',
+    'requests',
+    'qrcode',
+    'packaging',
+    'packaging.version',
+    'packaging.specifiers',
+    'packaging.requirements',
     'googleapiclient',
     'google_auth_oauthlib',
     'google.oauth2.credentials',

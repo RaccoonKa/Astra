@@ -37,6 +37,7 @@
     </StandardDirectory>
 
     <Icon Id="AppIcon.ico" SourceFile="assets\icon\ico\icon_round.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
 
     <ComponentGroup Id="ProductComponents">
       <Files Include="dist\Astra\**" />

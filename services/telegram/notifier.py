@@ -1,22 +1,16 @@
 import os
 import json
+import tempfile
 import threading
-from pathlib import Path
 import cv2
 import requests
+from core.utils.config import load_config
 
 
 def _send_photo_worker(frame_or_path, caption: str, with_keyboard: bool = True):
     temp_file = None
     try:
-        base_dir = Path(__file__).resolve().parent.parent.parent
-        config_path = base_dir / "personal_data" / "configs" / "config.json"
-
-        if not config_path.exists():
-            return
-
-        with open(config_path, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
+        cfg = load_config()
 
         token = cfg.get("api_keys", {}).get("telegram_token", "")
         admin_id = cfg.get("api_keys", {}).get("telegram_admin_id", 0)
@@ -28,7 +22,7 @@ def _send_photo_worker(frame_or_path, caption: str, with_keyboard: bool = True):
         if isinstance(frame_or_path, str):
             photo_path = frame_or_path
         elif frame_or_path is not None:
-            temp_file = str(base_dir / "temp_intruder.png")
+            temp_file = os.path.join(tempfile.gettempdir(), "temp_intruder.png")
             cv2.imwrite(temp_file, frame_or_path)
             photo_path = temp_file
         else:
@@ -36,7 +30,7 @@ def _send_photo_worker(frame_or_path, caption: str, with_keyboard: bool = True):
             ret, frame = cap.read()
             cap.release()
             if ret:
-                temp_file = str(base_dir / "temp_intruder.png")
+                temp_file = os.path.join(tempfile.gettempdir(), "temp_intruder.png")
                 cv2.imwrite(temp_file, frame)
                 photo_path = temp_file
 
@@ -79,14 +73,7 @@ def send_security_alert(frame_or_path=None, caption="⚠️ Замечен по�
 def send_telegram_notification(text: str):
     def _worker():
         try:
-            base_dir = Path(__file__).resolve().parent.parent.parent
-            config_path = base_dir / "personal_data" / "configs" / "config.json"
-
-            if not config_path.exists():
-                return
-
-            with open(config_path, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
+            cfg = load_config()
 
             token = cfg.get("api_keys", {}).get("telegram_token", "")
             admin_id = cfg.get("api_keys", {}).get("telegram_admin_id", 0)
