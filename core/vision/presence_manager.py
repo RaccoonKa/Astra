@@ -1,4 +1,6 @@
 import os
+import cv2
+import numpy as np
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 from core.utils.config import get_user_data_path
 
@@ -23,25 +25,49 @@ class PresenceManager(QObject):
 
     def load_owner_faces(self):
         owner_folder = os.path.normpath(get_user_data_path("..", "owner_face"))
+        cache_file = os.path.join(owner_folder, "encodings_cache.npy")
         self.owner_encodings = []
 
-        if os.path.exists(owner_folder):
+        if not os.path.exists(owner_folder):
+            return
+
+        valid_exts = (".jpg", ".jpeg", ".png")
+        image_files = [
+            os.path.join(owner_folder, f)
+            for f in os.listdir(owner_folder)
+            if f.lower().endswith(valid_exts)
+        ]
+
+        if not image_files:
+            return
+
+        if os.path.exists(cache_file):
             try:
-                import face_recognition
-                valid_exts = (".jpg", ".jpeg", ".png")
-                for file_name in os.listdir(owner_folder):
-                    if file_name.lower().endswith(valid_exts):
-                        file_path = os.path.join(owner_folder, file_name)
-                        img = face_recognition.load_image_file(file_path)
-                        encodings = face_recognition.face_encodings(img)
-                        if encodings:
-                            self.owner_encodings.append(encodings[0])
-                if self.owner_encodings:
-                    print(f"[PRESENCE]: Загружено {len(self.owner_encodings)} фото владельца.")
-            except (ImportError, ModuleNotFoundError):
-                print("[PRESENCE INFO]: Модуль 'face_recognition' не установлен в Python. Распознавание лиц по фото временно отключено.")
-            except Exception as e:
-                print(f"[PRESENCE WARNING]: Ошибка при загрузке фото владельца: {e}")
+                cache_mtime = os.path.getmtime(cache_file)
+                newest_img_mtime = max(os.path.getmtime(f) for f in image_files)
+                if cache_mtime >= newest_img_mtime:
+                    cached = np.load(cache_file, allow_pickle=True)
+                    self.owner_encodings = list(cached)
+                    print(f"[PRESENCE]: Загружено {len(self.owner_encodings)} фото владельца из кэша (0.01с).")
+                    return
+            except Exception:
+                pass
+
+        try:
+            import face_recognition
+            for file_path in image_files:
+                img = face_recognition.load_image_file(file_path)
+                encodings = face_recognition.face_encodings(img)
+                if encodings:
+                    self.owner_encodings.append(encodings[0])
+
+            if self.owner_encodings:
+                np.save(cache_file, np.array(self.owner_encodings, dtype=object))
+                print(f"[PRESENCE]: Закодировано и закэшировано {len(self.owner_encodings)} фото владельца.")
+        except (ImportError, ModuleNotFoundError):
+            print("[PRESENCE INFO]: Модуль 'face_recognition' не установлен.")
+        except Exception as e:
+            print(f"[PRESENCE WARNING]: Ошибка при загрузке фото: {e}")
 
     def verify_faces(self, frame_rgb):
         if not self.owner_encodings:
@@ -49,15 +75,23 @@ class PresenceManager(QObject):
 
         try:
             import face_recognition
-            face_locations = face_recognition.face_locations(frame_rgb)
-            if not face_locations:
+
+            small_frame = cv2.resize(frame_rgb, (0, 0), fx=0.5, fy=0.5)
+            small_locations = face_recognition.face_locations(small_frame, model="hog")
+
+            if not small_locations:
                 return False, False
 
-            face_encodings = face_recognition.face_encodings(frame_rgb, face_locations)
+            real_locations = [
+                (top * 2, right * 2, bottom * 2, left * 2)
+                for (top, right, bottom, left) in small_locations
+            ]
+
+            face_encodings = face_recognition.face_encodings(frame_rgb, real_locations)
 
             owner_found = False
             for face_encoding in face_encodings:
-                matches = face_recognition.compare_faces(self.owner_encodings, face_encoding, tolerance=0.5)
+                matches = face_recognition.compare_faces(self.owner_encodings, face_encoding, tolerance=0.50)
                 if True in matches:
                     owner_found = True
                     break

@@ -543,11 +543,13 @@ class TelegramBotThread(QThread):
         super().__init__(parent)
         self.loop = None
         self.bot = None
+        self._running = True
 
     def run(self):
         cfg = load_config()
         token = cfg.get("api_keys", {}).get("telegram_token", "")
         if not token:
+            print("[TELEGRAM BOT]: Токен бота не указан в config.json!")
             return
 
         self.loop = asyncio.new_event_loop()
@@ -556,10 +558,24 @@ class TelegramBotThread(QThread):
         global current_bot_instance
         current_bot_instance = self.bot
 
+        async def _run_polling():
+            while self._running:
+                try:
+                    print("[TELEGRAM BOT]: Запуск polling...")
+                    await dp.start_polling(self.bot, handle_signals=False)
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    print(f"[TELEGRAM BOT ERROR]: Сбой соединения: {e}")
+                    if not self._running:
+                        break
+                    print("[TELEGRAM BOT]: Повторная попытка подключения через 5 секунд...")
+                    await asyncio.sleep(5)
+
         try:
-            self.loop.run_until_complete(dp.start_polling(self.bot))
-        except Exception:
-            pass
+            self.loop.run_until_complete(_run_polling())
+        except Exception as e:
+            print(f"[TELEGRAM BOT CRITICAL]: {e}")
         finally:
             try:
                 self.loop.run_until_complete(self.bot.session.close())
@@ -568,6 +584,7 @@ class TelegramBotThread(QThread):
             self.loop.close()
 
     def stop(self):
+        self._running = False
         if self.loop and self.loop.is_running():
             asyncio.run_coroutine_threadsafe(dp.stop_polling(), self.loop)
         self.wait(1500)

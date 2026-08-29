@@ -1,0 +1,39 @@
+{
+    "user_name": "друг",
+    "assistant_name": "Астра",
+    "user_gender": "male",
+    "city": "Москва",
+    "autostart": false,
+    "first_run": true,
+    "is_configured": false,
+    "music_service": "spotify",
+    "use_spotify": false,
+    "vpn_service": "",
+    "hdrezka_domain": "https://ru1.hdreskaz.top",
+    "work_apps": [
+        "https://github.com"
+    ],
+    "rest_apps": [
+        "https://youtube.com"
+    ],
+    "modules": {
+        "vision": false,
+        "gestures": false,
+        "face_recognition": false,
+        "eye_tracking": false,
+        "telegram": false,
+        "gigachat": false,
+        "contacts": false,
+        "memory": true
+    },
+    "api_keys": {
+        "gigachat": "",
+        "telegram_token": "",
+        "telegram_admin_id": 0,
+        "weather": "",
+        "yandex_music_token": "",
+        "spotify_client_id": "",
+        "spotify_client_secret": "",
+        "yandex_iot_token": ""
+    }
+}

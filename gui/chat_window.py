@@ -29,7 +29,7 @@ from core.nlp.command_parser import CommandParser
 from core.system.actions import SystemActions
 from core.vision.vision_provider import VisionThread
 from core.vision.presence_manager import PresenceManager
-from core.utils.config import get_resource_path
+from core.utils.config import get_resource_path, load_config
 from core.utils.updater import UpdateCheckerThread
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
 from comtypes import CoInitialize, CoUninitialize
@@ -724,6 +724,16 @@ class MainWindow(QWidget):
             self.toggle_settings()
         self.settings_panel.scroll_to_bottom()
 
+    def restart_telegram_bot(self):
+        if hasattr(self, 'telegram_thread') and self.telegram_thread and self.telegram_thread.isRunning():
+            self.telegram_thread.stop()
+            self.telegram_thread = None
+
+        cfg = load_config()
+        if cfg.get("api_keys", {}).get("telegram_token"):
+            self.telegram_thread = TelegramBotThread(parent=self)
+            self.telegram_thread.start()
+
     def init_ui(self):
         font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
         font_id = QFontDatabase.addApplicationFont(font_path)
@@ -837,6 +847,7 @@ class MainWindow(QWidget):
         self.settings_panel.hide()
         self.settings_panel.speak_requested.connect(self.speak_reply)
         self.settings_panel.vision_state_changed.connect(self.on_vision_state_changed)
+        self.settings_panel.telegram_config_changed.connect(self.restart_telegram_bot)
         container_layout.addWidget(self.settings_panel)
 
         self.right_panel = ChatFrame()

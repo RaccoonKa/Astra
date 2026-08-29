@@ -43,6 +43,7 @@ class VisionThread(QThread):
             pass
 
     def run(self):
+        cv2.setNumThreads(2)
         self._update_modules_config()
         cap = None
 
