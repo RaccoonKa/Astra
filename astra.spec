@@ -14,25 +14,21 @@ datas = []
 binaries = []
 hiddenimports = []
 
-# Автоматический сбор всех бинарников, DLL и данных для Vosk
 vosk_datas, vosk_binaries, vosk_hidden = collect_all('vosk')
 datas += vosk_datas
 binaries += vosk_binaries
 hiddenimports += vosk_hidden
 
-# Конфиги VPN
 vpn_templates = os.path.join(base_dir, 'services', 'vpn', 'templates')
 if os.path.exists(vpn_templates):
     datas.append((vpn_templates, os.path.join('services', 'vpn', 'templates')))
 
-# Директории ресурсов
 if os.path.exists(os.path.join(base_dir, 'assets')):
     datas.append((os.path.join(base_dir, 'assets'), 'assets'))
 
 if os.path.exists(os.path.join(base_dir, 'optimized_models')):
     datas.append((os.path.join(base_dir, 'optimized_models'), 'optimized_models'))
 
-# Конфиги и токены Google
 template_path = os.path.join(base_dir, 'personal_data', 'configs', 'config.template.json')
 if os.path.exists(template_path):
     datas.append((template_path, os.path.join('personal_data', 'configs')))
@@ -41,7 +37,6 @@ google_creds_path = os.path.join(base_dir, 'personal_data', 'configs', 'google',
 if os.path.exists(google_creds_path):
     datas.append((google_creds_path, os.path.join('personal_data', 'configs', 'google')))
 
-# Пакеты данных для нейросетей
 datas += collect_data_files('transformers')
 datas += collect_data_files('torch')
 try:
@@ -85,11 +80,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        'tkinter', 'matplotlib', 'notebook',
-        'torch.distributed', 'torch.testing', 'torch.utils.benchmark',
-        'caffe2', 'unittest', 'pytest', 'IPython'
-    ],
+    excludes=['tkinter', 'matplotlib', 'notebook', 'IPython'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
