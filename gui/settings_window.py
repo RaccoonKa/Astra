@@ -414,7 +414,6 @@ class SettingsFrame(QFrame):
             dialog = TelegramPairDialog(self.font_family, self)
             if dialog.exec():
                 self.load_settings()
-                self.telegram_config_changed.emit()
         except Exception as e:
             print(f"[Telegram Pair Error]: {e}")
 

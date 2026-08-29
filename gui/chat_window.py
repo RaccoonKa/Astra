@@ -1142,8 +1142,6 @@ class MainWindow(QWidget):
             self.speak_reply(msg)
             return
 
-        self.chat_history.append(f"Вы (голос): {text}")
-
         text_low = text.lower()
         if any(w in text_low for w in ["заблокируй", "залочь", "заблокировать", "залочить"]):
             self.absence_start_time = time.time()
@@ -1157,16 +1155,21 @@ class MainWindow(QWidget):
     def on_voice_command_finished(self, response):
         if response:
             is_whisper = False
+            user_display = self.voice_worker.text
             if isinstance(response, dict):
                 chat_text = response.get("chat", "")
                 voice_text = response.get("voice", "")
                 emotion = response.get("emotion", "neutral")
                 is_whisper = response.get("is_whisper", False)
+                user_display = response.get("user_display", user_display)
             else:
                 chat_text = voice_text = str(response)
                 emotion = getattr(self.command_parser, "last_emotion", "neutral")
 
             self.left_panel.set_emotion(emotion)
+
+            if user_display:
+                self.chat_history.append(f"Вы (голос): {user_display}")
 
             if chat_text:
                 self.chat_history.append(f"Астра: {chat_text}\n")
@@ -1178,6 +1181,8 @@ class MainWindow(QWidget):
             if voice_text:
                 self.speak_reply(voice_text, is_whisper=is_whisper)
         else:
+            if hasattr(self, 'voice_worker') and self.voice_worker.text:
+                self.chat_history.append(f"Вы (голос): {self.voice_worker.text}")
             emotion = getattr(self.command_parser, "last_emotion", "neutral")
             self.left_panel.set_emotion(emotion)
 

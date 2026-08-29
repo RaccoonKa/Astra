@@ -4,6 +4,7 @@ import sys
 import time
 import json
 import wave
+import tempfile
 import subprocess
 from pathlib import Path
 import psutil
@@ -241,8 +242,8 @@ def check_and_pair_token(token_arg: str, user_id: int, user_name: str) -> bool:
                 json.dump(session, f, ensure_ascii=False, indent=4)
 
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Pair Token Error]: {e}")
     return False
 
 
@@ -255,7 +256,7 @@ async def cmd_start(message: types.Message, command: CommandObject):
         user_first_name = message.from_user.first_name or "друг"
         if check_and_pair_token(token_arg.strip(), message.from_user.id, user_first_name):
             await message.answer(
-                f"Устройство успешно привязано к профилю {user_first_name}! Теперь я могу управлять твоим ПК.",
+                f"Устройство успешно привязано к профилю {user_first_name}! Теперь я могу управлять твоим ПК. ✨",
                 reply_markup=main_keyboard
             )
             return
@@ -273,6 +274,7 @@ async def cmd_start(message: types.Message, command: CommandObject):
 @dp.message(Command("say"))
 async def cmd_say(message: types.Message, command: CommandObject):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
         return
     phrase = command.args
     if not phrase:
@@ -286,6 +288,7 @@ async def cmd_say(message: types.Message, command: CommandObject):
 @dp.message(Command("get"))
 async def cmd_get_file(message: types.Message, command: CommandObject):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
         return
     query = command.args
     if not query:
@@ -359,55 +362,68 @@ async def handle_security_ignore(callback: types.CallbackQuery):
 @dp.message(F.text == "Скриншот")
 async def handle_screen(message: types.Message):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
         return
-    path = "temp_screen.png"
+    path = os.path.join(tempfile.gettempdir(), f"temp_screen_{int(time.time())}.png")
     try:
         pyautogui.screenshot(path)
         photo = FSInputFile(path)
         await message.answer_photo(photo, caption="Рабочий стол")
-    except Exception:
+    except Exception as e:
+        print(f"[Telegram Screenshot Error]: {e}")
         await message.answer(ERROR_UNREACHABLE_MSG)
     finally:
         if os.path.exists(path):
-            os.remove(path)
+            try:
+                os.remove(path)
+            except Exception:
+                pass
 
 
 @dp.message(F.text == "Веб-камера")
 async def handle_cam(message: types.Message):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
         return
-    path = "temp_cam.png"
+    path = os.path.join(tempfile.gettempdir(), f"temp_cam_{int(time.time())}.png")
     try:
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         ret, frame = cap.read()
         cap.release()
-        if ret:
+        if ret and frame is not None:
             cv2.imwrite(path, frame)
             photo = FSInputFile(path)
             await message.answer_photo(photo, caption="Снимок с камеры")
         else:
             await message.answer("Ой, не могу включить камеру... Возможно, её уже заняло другое приложение 📷")
-    except Exception:
+    except Exception as e:
+        print(f"[Telegram Camera Error]: {e}")
         await message.answer(ERROR_UNREACHABLE_MSG)
     finally:
         if os.path.exists(path):
-            os.remove(path)
+            try:
+                os.remove(path)
+            except Exception:
+                pass
 
 
 @dp.message(F.text == "Статус ПК")
 async def handle_status(message: types.Message):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
         return
     try:
         status_text = get_hardware_status()
         await message.answer(status_text, parse_mode="Markdown")
-    except Exception:
+    except Exception as e:
+        print(f"[Telegram Status Error]: {e}")
         await message.answer(ERROR_UNREACHABLE_MSG)
 
 
 @dp.message(F.text == "Заблокировать ПК")
 async def handle_lock(message: types.Message):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
         return
     try:
         subprocess.run("rundll32.exe user32.dll,LockWorkStation", shell=True)
@@ -419,6 +435,7 @@ async def handle_lock(message: types.Message):
 @dp.message(F.text == "Перезагрузить ПК")
 async def handle_restart(message: types.Message):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
         return
     try:
         await message.answer("Перезагружаю компьютер... 🔄")
@@ -430,6 +447,7 @@ async def handle_restart(message: types.Message):
 @dp.message(F.text == "Выключить ПК")
 async def handle_off(message: types.Message):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
         return
     try:
         await message.answer("Выключаю ПК. До связи! 👋")
@@ -464,11 +482,13 @@ async def handle_document_upload(message: types.Message, bot: Bot):
 @dp.message(F.voice)
 async def handle_voice_message(message: types.Message, bot: Bot):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Привяжи устройство через QR-код.")
         return
 
-    raw_ogg = f"temp_voice_{message.message_id}.ogg"
-    wav_path = f"temp_voice_{message.message_id}.wav"
-    reply_voice_path = f"temp_reply_{message.message_id}.ogg"
+    temp_dir = tempfile.gettempdir()
+    raw_ogg = os.path.join(temp_dir, f"temp_voice_{message.message_id}.ogg")
+    wav_path = os.path.join(temp_dir, f"temp_voice_{message.message_id}.wav")
+    reply_voice_path = os.path.join(temp_dir, f"temp_reply_{message.message_id}.ogg")
 
     try:
         file = await bot.get_file(message.voice.file_id)
@@ -515,6 +535,7 @@ async def handle_voice_message(message: types.Message, bot: Bot):
 @dp.message(F.text)
 async def handle_text_chat(message: types.Message):
     if message.from_user.id != get_admin_id():
+        await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
         return
 
     text = message.text.strip()
@@ -547,9 +568,8 @@ class TelegramBotThread(QThread):
 
     def run(self):
         cfg = load_config()
-        token = cfg.get("api_keys", {}).get("telegram_token", "")
+        token = cfg.get("api_keys", {}).get("telegram_token", "").strip()
         if not token:
-            print("[TELEGRAM BOT]: Токен бота не указан в config.json!")
             return
 
         self.loop = asyncio.new_event_loop()
@@ -561,21 +581,19 @@ class TelegramBotThread(QThread):
         async def _run_polling():
             while self._running:
                 try:
-                    print("[TELEGRAM BOT]: Запуск polling...")
-                    await dp.start_polling(self.bot, handle_signals=False)
+                    await dp.start_polling(self.bot, handle_signals=False, close_bot_session=True)
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
-                    print(f"[TELEGRAM BOT ERROR]: Сбой соединения: {e}")
+                    print(f"[TELEGRAM BOT POLLING ERROR]: {e}")
                     if not self._running:
                         break
-                    print("[TELEGRAM BOT]: Повторная попытка подключения через 5 секунд...")
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(4)
 
         try:
             self.loop.run_until_complete(_run_polling())
         except Exception as e:
-            print(f"[TELEGRAM BOT CRITICAL]: {e}")
+            print(f"[TELEGRAM BOT THREAD ERROR]: {e}")
         finally:
             try:
                 self.loop.run_until_complete(self.bot.session.close())
@@ -586,7 +604,10 @@ class TelegramBotThread(QThread):
     def stop(self):
         self._running = False
         if self.loop and self.loop.is_running():
-            asyncio.run_coroutine_threadsafe(dp.stop_polling(), self.loop)
+            try:
+                asyncio.run_coroutine_threadsafe(dp.stop_polling(), self.loop)
+            except Exception:
+                pass
         self.wait(1500)
 
 
