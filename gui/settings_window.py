@@ -6,7 +6,7 @@ import winreg
 import shutil
 from PyQt6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QScrollArea, QWidget, QComboBox, QDialog, QTextEdit, QFileDialog, QSlider
+    QPushButton, QScrollArea, QWidget, QComboBox, QDialog, QTextEdit, QFileDialog, QSlider, QProgressBar
 )
 from PyQt6.QtCore import (
     Qt, QTimer, QRectF, QPoint, QPointF, pyqtSignal,
@@ -17,6 +17,7 @@ from PyQt6.QtGui import (
     QFont, QFontDatabase
 )
 from core.utils.config import load_config, save_config, get_user_data_path, get_resource_path
+from core.utils.updater import CURRENT_VERSION, DownloaderThread, apply_update_and_restart
 
 SPEECH_HINTS = {
     "autostart": "Включив автозапуск, я буду просыпаться одновременно с твоим компьютером! Тебе даже не придется искать мою иконку — я сразу буду тут, готова помогать.",
@@ -351,6 +352,8 @@ class SettingsFrame(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.border_phase = 0.0
         self.saved_vision_state = False
+        self.update_download_url = None
+        self.downloader_thread = None
 
         font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
         font_id = QFontDatabase.addApplicationFont(font_path)
@@ -491,9 +494,9 @@ class SettingsFrame(QFrame):
         title.setFont(QFont(self.font_family, 15, QFont.Weight.Bold))
         main_layout.addWidget(title)
 
-        scroll = SmoothScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setObjectName("SettingsScroll")
+        self.scroll = SmoothScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setObjectName("SettingsScroll")
 
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
@@ -720,8 +723,54 @@ class SettingsFrame(QFrame):
 
         scroll_layout.addWidget(card_keys)
 
-        scroll.setWidget(scroll_content)
-        main_layout.addWidget(scroll)
+        card_update = QFrame()
+        card_update.setObjectName("SettingsCard")
+        layout_update = QVBoxLayout(card_update)
+        layout_update.setContentsMargins(10, 8, 10, 10)
+        layout_update.setSpacing(8)
+
+        lbl_upd_head = QLabel("Обновление Астры")
+        lbl_upd_head.setObjectName("CardHeader")
+        lbl_upd_head.setFont(QFont(self.font_family, 11, QFont.Weight.Bold))
+        layout_update.addWidget(lbl_upd_head)
+
+        row_ver = QHBoxLayout()
+        row_ver.setContentsMargins(4, 2, 4, 2)
+        row_ver.setSpacing(10)
+
+        self.lbl_current_ver = QLabel(f"Текущая версия: v{CURRENT_VERSION}")
+        self.lbl_current_ver.setObjectName("ToggleLabel")
+        self.lbl_current_ver.setFont(QFont(self.font_family, 11))
+        row_ver.addWidget(self.lbl_current_ver)
+        row_ver.addStretch()
+
+        self.btn_update = QPushButton("🚀 Обновить")
+        self.btn_update.setObjectName("UpdateButton")
+        self.btn_update.setFont(QFont(self.font_family, 10, QFont.Weight.Bold))
+        self.btn_update.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_update.clicked.connect(self._start_download_update)
+        self.btn_update.hide()
+        row_ver.addWidget(self.btn_update)
+
+        layout_update.addLayout(row_ver)
+
+        self.lbl_update_status = QLabel("Установлена самая свежая версия ✨")
+        self.lbl_update_status.setFont(QFont(self.font_family, 11))
+        self.lbl_update_status.setStyleSheet("color: rgba(255, 253, 231, 0.7); padding-left: 4px;")
+        layout_update.addWidget(self.lbl_update_status)
+
+        self.update_progress = QProgressBar()
+        self.update_progress.setObjectName("UpdateProgressBar")
+        self.update_progress.setFont(QFont(self.font_family, 10, QFont.Weight.Bold))
+        self.update_progress.setRange(0, 100)
+        self.update_progress.setValue(0)
+        self.update_progress.hide()
+        layout_update.addWidget(self.update_progress)
+
+        scroll_layout.addWidget(card_update)
+
+        self.scroll.setWidget(scroll_content)
+        main_layout.addWidget(self.scroll)
 
         self.status_label = QLabel("")
         self.status_label.setObjectName("StatusLabel")
@@ -745,6 +794,52 @@ class SettingsFrame(QFrame):
         main_layout.addLayout(btn_container)
 
         self.setLayout(main_layout)
+
+    def scroll_to_bottom(self):
+        def _do_scroll():
+            v_bar = self.scroll.verticalScrollBar()
+            v_bar.setValue(v_bar.maximum())
+            self.scroll._target_pos = None
+
+        QTimer.singleShot(250, _do_scroll)
+        QTimer.singleShot(650, _do_scroll)
+
+    def set_update_available(self, new_ver: str, changelog: str, download_url: str):
+        self.update_download_url = download_url
+        self.lbl_update_status.setText(f"Доступна новая версия: v{new_ver}! 🌟")
+        self.lbl_update_status.setStyleSheet("color: #ffd700; font-size: 11px; font-weight: bold; padding-left: 4px;")
+        self.btn_update.setText(f"🚀 Обновить до v{new_ver}")
+        self.btn_update.show()
+
+    def _start_download_update(self):
+        if not self.update_download_url:
+            return
+
+        self.btn_update.setEnabled(False)
+        self.btn_update.setText("Загрузка...")
+        self.update_progress.setValue(0)
+        self.update_progress.show()
+        self.lbl_update_status.setText("Скачиваю установочный пакет обновления...")
+
+        self.downloader_thread = DownloaderThread(self.update_download_url)
+        self.downloader_thread.progress_changed.connect(self._on_download_progress)
+        self.downloader_thread.download_finished.connect(self._on_download_finished)
+        self.downloader_thread.error_occurred.connect(self._on_download_error)
+        self.downloader_thread.start()
+
+    def _on_download_progress(self, percent: int):
+        self.update_progress.setValue(percent)
+
+    def _on_download_finished(self, installer_path: str):
+        self.lbl_update_status.setText("Запускаю установщик обновления! До скорого! ✨")
+        QTimer.singleShot(1000, lambda: apply_update_and_restart(installer_path))
+
+    def _on_download_error(self, err: str):
+        self.update_progress.hide()
+        self.btn_update.setEnabled(True)
+        self.btn_update.setText("Попробовать снова")
+        self.lbl_update_status.setText("Ошибка скачивания обновления 🥺")
+        self.lbl_update_status.setStyleSheet("color: #ff5252; font-size: 11px; padding-left: 4px;")
 
     def _on_volume_slider_changed(self, value):
         self.lbl_vol_title.setText(f"Громкость речи: {value}%")

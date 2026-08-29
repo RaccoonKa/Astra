@@ -303,4 +303,48 @@ QPushButton#ExitBtn:hover {
     background-color: rgba(92, 78, 26, 0.2);
     color: #ffd700;
 }
+
+QProgressBar#UpdateProgressBar {
+    background-color: rgba(5, 5, 3, 0.9);
+    border: 1px solid rgba(196, 160, 40, 0.4);
+    border-radius: 7px;
+    text-align: center;
+    color: #ffd700;
+    font-size: 11px;
+    font-weight: bold;
+    height: 20px;
+}
+QProgressBar#UpdateProgressBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #a88820, stop:1 #ffd700);
+    border-radius: 6px;
+}
+
+QPushButton#UpdateButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #a88820, stop:1 #ffd700);
+    color: #0d0a05;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 11px;
+}
+QPushButton#UpdateButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ffd700, stop:1 #ffffff);
+}
+
+QPushButton#UpdateNotificationBadge {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(36, 30, 14, 0.95), stop:1 rgba(66, 54, 22, 0.95));
+    color: #ffd700;
+    border: 1.2px solid rgba(255, 215, 0, 0.85);
+    border-radius: 13px;
+    padding: 3px 14px;
+    font-size: 11px;
+    font-weight: bold;
+    height: 26px;
+}
+QPushButton#UpdateNotificationBadge:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(70, 58, 24, 0.95), stop:1 rgba(110, 90, 36, 0.95));
+    color: #ffffff;
+    border: 1.2px solid #ffffff;
+}
 """

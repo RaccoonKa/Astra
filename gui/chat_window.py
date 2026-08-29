@@ -30,6 +30,7 @@ from core.system.actions import SystemActions
 from core.vision.vision_provider import VisionThread
 from core.vision.presence_manager import PresenceManager
 from core.utils.config import get_resource_path
+from core.utils.updater import UpdateCheckerThread
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
 from comtypes import CoInitialize, CoUninitialize
 
@@ -706,6 +707,23 @@ class MainWindow(QWidget):
             self.telegram_thread = TelegramBotThread(parent=self)
             self.telegram_thread.start()
 
+        QTimer.singleShot(3000, self._check_updates)
+
+    def _check_updates(self):
+        self.update_checker = UpdateCheckerThread(parent=self)
+        self.update_checker.update_available.connect(self.on_update_found)
+        self.update_checker.start()
+
+    def on_update_found(self, new_ver: str, changelog: str, download_url: str):
+        self.settings_panel.set_update_available(new_ver, changelog, download_url)
+        self.update_badge_btn.setText(f"✨ v{new_ver} доступна!")
+        self.update_badge_btn.show()
+
+    def open_settings_for_update(self):
+        if not (self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0):
+            self.toggle_settings()
+        self.settings_panel.scroll_to_bottom()
+
     def init_ui(self):
         font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
         font_id = QFontDatabase.addApplicationFont(font_path)
@@ -746,7 +764,7 @@ class MainWindow(QWidget):
         self.title_btns_widget = QWidget()
         title_btns_layout = QHBoxLayout(self.title_btns_widget)
         title_btns_layout.setContentsMargins(0, 0, 0, 0)
-        title_btns_layout.setSpacing(0)
+        title_btns_layout.setSpacing(6)
 
         self.exit_btn = QPushButton("⏻")
         self.exit_btn.setObjectName("ExitBtn")
@@ -759,6 +777,14 @@ class MainWindow(QWidget):
         self.settings_btn.setFixedWidth(30)
         self.settings_btn.clicked.connect(self.toggle_settings)
         title_btns_layout.addWidget(self.settings_btn)
+
+        self.update_badge_btn = QPushButton("✨ v2.0.0 доступна!")
+        self.update_badge_btn.setObjectName("UpdateNotificationBadge")
+        self.update_badge_btn.setFont(QFont(self.font_family, 10, QFont.Weight.Bold))
+        self.update_badge_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_badge_btn.clicked.connect(self.open_settings_for_update)
+        self.update_badge_btn.hide()
+        title_btns_layout.addWidget(self.update_badge_btn)
 
         self.toggle_chat_btn = QPushButton("💭")
         self.toggle_chat_btn.setObjectName("TitleBtn")
