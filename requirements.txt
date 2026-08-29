@@ -6,7 +6,6 @@ qrcode>=7.4.2
 
 # Нейросети, распознавание и синтез речи
 torch>=2.1.0
-vosk>=0.3.45
 transformers>=4.35.0
 optimum[onnxruntime]>=1.14.0
 onnxruntime>=1.16.0
@@ -40,3 +39,6 @@ spotipy>=2.23.0
 yandex-music>=2.1.1
 google-api-python-client>=2.100.0
 google-auth-oauthlib>=1.1.0
+
+# Полезные команды для сборки: wix build -acceptEula wix7 Package.wxs -o Astra_v2.0.0_Setup.msi
+# pyinstaller astra.spec --noconfirm --clean
