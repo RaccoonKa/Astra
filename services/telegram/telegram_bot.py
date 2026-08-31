@@ -15,9 +15,10 @@ import soundfile as sf
 import sounddevice as sd
 import numpy as np
 import vosk
-from aiogram import Bot, Dispatcher, F, types
+from aiogram import Bot, Dispatcher, Router, F, types
 from aiogram.filters import Command, CommandObject
 from aiogram.types import FSInputFile, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.client.session.aiohttp import AiohttpSession
 from PyQt6.QtCore import QThread
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -37,7 +38,7 @@ PAIRING_PATH = Path(get_user_data_path("pairing_session.json"))
 VOSK_MODEL_PATH = APP_DIR / "optimized_models" / "model_vosk"
 SILERO_PATH = APP_DIR / "optimized_models" / "silero_tts" / "v4_ru.pt"
 
-dp = Dispatcher()
+router = Router()
 current_bot_instance = None
 command_parser_instance = None
 corrector_instance = None
@@ -247,7 +248,7 @@ def check_and_pair_token(token_arg: str, user_id: int, user_name: str) -> bool:
     return False
 
 
-@dp.message(Command("start"))
+@router.message(Command("start"))
 async def cmd_start(message: types.Message, command: CommandObject):
     admin_id = get_admin_id()
     token_arg = command.args
@@ -265,13 +266,14 @@ async def cmd_start(message: types.Message, command: CommandObject):
             return
 
     if admin_id != 0 and message.from_user.id == admin_id:
-        await message.answer("Привет-привет! Рада тебя видеть! На связи и вся во внимании. 💛", reply_markup=main_keyboard)
+        await message.answer("Привет-привет! Рада тебя видеть! На связи и вся во внимании. 💛",
+                             reply_markup=main_keyboard)
         return
 
     await message.answer("Доступ запрещен. Открой мои настройки на компьютере и отсканируй QR-код для привязки.")
 
 
-@dp.message(Command("say"))
+@router.message(Command("say"))
 async def cmd_say(message: types.Message, command: CommandObject):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
@@ -285,14 +287,16 @@ async def cmd_say(message: types.Message, command: CommandObject):
     await message.answer(f"📢 Сказала на компьютере: «{phrase}»")
 
 
-@dp.message(Command("get"))
+@router.message(Command("get"))
 async def cmd_get_file(message: types.Message, command: CommandObject):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
         return
     query = command.args
     if not query:
-        await message.answer("Укажи имя файла или полный путь.\nНапример: `/get document.pdf` или `/get C:\\Games\\file.txt`", parse_mode="Markdown")
+        await message.answer(
+            "Укажи имя файла или полный путь.\nНапример: `/get document.pdf` или `/get C:\\Games\\file.txt`",
+            parse_mode="Markdown")
         return
 
     raw_query = query.strip().strip('"').strip("'")
@@ -331,7 +335,7 @@ async def cmd_get_file(message: types.Message, command: CommandObject):
         await message.answer("Не удалось отправить файл 🥺")
 
 
-@dp.callback_query(F.data == "security_lock")
+@router.callback_query(F.data == "security_lock")
 async def handle_security_lock(callback: types.CallbackQuery):
     if callback.from_user.id != get_admin_id():
         await callback.answer("Доступ запрещен!", show_alert=True)
@@ -347,7 +351,7 @@ async def handle_security_lock(callback: types.CallbackQuery):
         await callback.answer(ERROR_UNREACHABLE_MSG, show_alert=True)
 
 
-@dp.callback_query(F.data == "security_ignore")
+@router.callback_query(F.data == "security_ignore")
 async def handle_security_ignore(callback: types.CallbackQuery):
     if callback.from_user.id != get_admin_id():
         await callback.answer("Доступ запрещен!", show_alert=True)
@@ -359,7 +363,7 @@ async def handle_security_ignore(callback: types.CallbackQuery):
     await callback.answer("Блокировка отменена.")
 
 
-@dp.message(F.text == "Скриншот")
+@router.message(F.text == "Скриншот")
 async def handle_screen(message: types.Message):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
@@ -380,7 +384,7 @@ async def handle_screen(message: types.Message):
                 pass
 
 
-@dp.message(F.text == "Веб-камера")
+@router.message(F.text == "Веб-камера")
 async def handle_cam(message: types.Message):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
@@ -407,7 +411,7 @@ async def handle_cam(message: types.Message):
                 pass
 
 
-@dp.message(F.text == "Статус ПК")
+@router.message(F.text == "Статус ПК")
 async def handle_status(message: types.Message):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
@@ -420,7 +424,7 @@ async def handle_status(message: types.Message):
         await message.answer(ERROR_UNREACHABLE_MSG)
 
 
-@dp.message(F.text == "Заблокировать ПК")
+@router.message(F.text == "Заблокировать ПК")
 async def handle_lock(message: types.Message):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
@@ -432,7 +436,7 @@ async def handle_lock(message: types.Message):
         await message.answer(ERROR_UNREACHABLE_MSG)
 
 
-@dp.message(F.text == "Перезагрузить ПК")
+@router.message(F.text == "Перезагрузить ПК")
 async def handle_restart(message: types.Message):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
@@ -444,7 +448,7 @@ async def handle_restart(message: types.Message):
         await message.answer(ERROR_UNREACHABLE_MSG)
 
 
-@dp.message(F.text == "Выключить ПК")
+@router.message(F.text == "Выключить ПК")
 async def handle_off(message: types.Message):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
@@ -456,7 +460,7 @@ async def handle_off(message: types.Message):
         await message.answer(ERROR_UNREACHABLE_MSG)
 
 
-@dp.message(F.document)
+@router.message(F.document)
 async def handle_document_upload(message: types.Message, bot: Bot):
     if message.from_user.id != get_admin_id():
         return
@@ -479,7 +483,7 @@ async def handle_document_upload(message: types.Message, bot: Bot):
         await message.answer("Не удалось сохранить файл на ПК 🥺")
 
 
-@dp.message(F.voice)
+@router.message(F.voice)
 async def handle_voice_message(message: types.Message, bot: Bot):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Привяжи устройство через QR-код.")
@@ -532,7 +536,7 @@ async def handle_voice_message(message: types.Message, bot: Bot):
                     pass
 
 
-@dp.message(F.text)
+@router.message(F.text)
 async def handle_text_chat(message: types.Message):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
@@ -567,6 +571,9 @@ class TelegramBotThread(QThread):
         self._running = True
 
     def run(self):
+        if sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
         cfg = load_config()
         token = cfg.get("api_keys", {}).get("telegram_token", "").strip()
         if not token:
@@ -574,9 +581,15 @@ class TelegramBotThread(QThread):
 
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        self.bot = Bot(token=token)
+
+        session = AiohttpSession(timeout=60)
+        self.bot = Bot(token=token, session=session)
+
         global current_bot_instance
         current_bot_instance = self.bot
+
+        dp = Dispatcher()
+        dp.include_router(router)
 
         async def _run_polling():
             while self._running:
@@ -605,19 +618,27 @@ class TelegramBotThread(QThread):
         self._running = False
         if self.loop and self.loop.is_running():
             try:
-                asyncio.run_coroutine_threadsafe(dp.stop_polling(), self.loop)
+                self.loop.call_soon_threadsafe(self.loop.stop)
             except Exception:
                 pass
-        self.wait(1500)
+        self.wait(3000)
 
 
 async def main():
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
     cfg = load_config()
     token = cfg.get("api_keys", {}).get("telegram_token", "")
     if not token:
         print("[TELEGRAM BOT]: Токен бота не указан в config.json!")
         return
-    bot = Bot(token=token)
+
+    session = AiohttpSession(timeout=60)
+    bot = Bot(token=token, session=session)
+
+    dp = Dispatcher()
+    dp.include_router(router)
     await dp.start_polling(bot)
 
 

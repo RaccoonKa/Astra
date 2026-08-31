@@ -142,7 +142,7 @@ class AstraMicWidget(QFrame):
 
         self.intro_progress = 0.0
         self.particles = []
-        self.total_particles = 600
+        self.total_particles = 350
 
         self.current_r = 255.0
         self.current_g = 255.0
@@ -168,7 +168,7 @@ class AstraMicWidget(QFrame):
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate)
-        self.timer.start(16)
+        self.timer.start(24)
 
     def _init_particles(self):
         self.particles.clear()
@@ -251,7 +251,7 @@ class AstraMicWidget(QFrame):
 
     def animate(self):
         self.pulse += 0.015
-        self.beat_impulse += (self.target_impulse - self.beat_impulse) * 0.08
+        self.beat_impulse += (self.target_impulse - self.target_impulse) * 0.08
         self.target_impulse *= 0.93
 
         self.current_r += (self.target_r - self.current_r) * 0.06
@@ -315,6 +315,8 @@ class AstraMicWidget(QFrame):
         cur_g = int(self.current_g)
         cur_b = int(self.current_b)
 
+        painter.setPen(Qt.PenStyle.NoPen)
+
         for p in self.particles:
             if T < p['delay']:
                 continue
@@ -346,7 +348,6 @@ class AstraMicWidget(QFrame):
             alpha = int(base_alpha * min(1.0, local_t * 1.8))
             col.setAlpha(alpha)
 
-            painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QBrush(col))
             sz = p['size'] + (active_impulse * 1.8)
             painter.drawEllipse(QRectF(px - sz / 2, py - sz / 2, sz, sz))
@@ -387,7 +388,7 @@ class ChatFrame(QFrame):
         self.border_phase = 0.0
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate_border)
-        self.timer.start(20)
+        self.timer.start(40)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(12, 12, 12, 12)
@@ -511,7 +512,7 @@ class BackgroundFrame(QFrame):
 
         self.dust_cloud = []
         gold_spectrum = ["#ffffff", "#fffde7", "#fff59d", "#ffee55", "#ffd700", "#e5c158", "#c4a028", "#997a1e"]
-        for _ in range(1100):
+        for _ in range(900):
             curve = random.choice([0, 0, 0, 1, 1, 2])
             spread = random.gauss(0, 12) if random.random() < 0.7 else random.gauss(0, 26)
             self.dust_cloud.append({
@@ -528,7 +529,7 @@ class BackgroundFrame(QFrame):
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate_bg)
-        self.timer.start(20)
+        self.timer.start(45)
 
     def animate_bg(self):
         self.wave_phase += 0.005
@@ -697,17 +698,20 @@ class MainWindow(QWidget):
 
         cfg_modules = self.config.get("modules", {}) if isinstance(self.config, dict) else {}
         if cfg_modules.get("vision", False):
-            QTimer.singleShot(6500, self.start_vision)
+            QTimer.singleShot(12500, self.start_vision)
 
         atexit.register(self.ducker.restore)
 
         self.telegram_thread = None
-        cfg_keys = self.config.get("api_keys", {}) if isinstance(self.config, dict) else {}
-        if cfg_keys.get("telegram_token"):
-            self.telegram_thread = TelegramBotThread(parent=self)
-            self.telegram_thread.start()
+        QTimer.singleShot(8500, self._start_telegram_delayed)
 
         QTimer.singleShot(3000, self._check_updates)
+
+    def _start_telegram_delayed(self):
+        cfg_keys = self.config.get("api_keys", {}) if isinstance(self.config, dict) else {}
+        if cfg_keys.get("telegram_token") and self.telegram_thread is None:
+            self.telegram_thread = TelegramBotThread(parent=self)
+            self.telegram_thread.start()
 
     def _check_updates(self):
         self.update_checker = UpdateCheckerThread(parent=self)
@@ -831,7 +835,8 @@ class MainWindow(QWidget):
 
         self.author_label = QLabel("Created by Svetozar")
         self.author_label.setStyleSheet(
-            f"font-family: '{self.font_family}'; color: rgba(255, 255, 255, 0.0); font-size: 13px; font-weight: 500;")
+            f"font-family: '{self.font_family}'; color: rgba(255, 255, 255, 0.0); font-size: 13px; font-weight: 500;"
+        )
         left_layout.addWidget(self.author_label, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
 
         self.content_layout.addWidget(self.left_panel)
@@ -925,9 +930,8 @@ class MainWindow(QWidget):
         SystemActions.lock_screen()
 
     def on_user_returned(self):
-        user_name = "друг"
-        if isinstance(self.config, dict):
-            user_name = self.config.get("user_name", "друг")
+        cfg = load_config()
+        user_name = cfg.get("user_name", "друг")
 
         elapsed = (time.time() - self.absence_start_time) if self.absence_start_time else 0
         self.absence_start_time = None
@@ -966,9 +970,7 @@ class MainWindow(QWidget):
         self.speak_reply(msg)
 
     def on_deep_drowsiness(self):
-        cfg = self.config if isinstance(self.config, dict) else (
-            SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
-        )
+        cfg = load_config()
         if not cfg.get("modules", {}).get("eye_tracking", False):
             return
 
@@ -979,9 +981,7 @@ class MainWindow(QWidget):
         self.speak_reply(msg)
 
     def on_frequent_blinking(self):
-        cfg = self.config if isinstance(self.config, dict) else (
-            SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
-        )
+        cfg = load_config()
         if not cfg.get("modules", {}).get("eye_tracking", False):
             return
 
@@ -1067,7 +1067,7 @@ class MainWindow(QWidget):
             return
 
         self.vision_thread = VisionThread(camera_index=0, parent=self)
-        self.presence_manager = PresenceManager(timeout_seconds=600, parent=self)
+        self.presence_manager = PresenceManager(timeout_seconds=60, parent=self)
 
         self.vision_thread.face_detected_signal.connect(self.presence_manager.process_face_status)
         self.vision_thread.gesture_detected_signal.connect(self.on_gesture_detected)
@@ -1097,25 +1097,23 @@ class MainWindow(QWidget):
             QTimer.singleShot(2000, self.stop_vision)
 
     def on_unknown_user(self):
-        cfg = self.config if isinstance(self.config, dict) else (
-            SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
-        )
-        if not cfg.get("modules", {}).get("face_recognition", False):
+        cfg = load_config()
+        modules = cfg.get("modules", {})
+        face_rec_enabled = modules.get("face_recognition", modules.get("vision", False))
+        if not face_rec_enabled:
             return
 
         current_frame = getattr(self.vision_thread, "current_frame", None) if self.vision_thread else None
+        from services.telegram.notifier import send_security_alert
         send_security_alert(
             frame_or_path=current_frame,
-            caption="⚠️ Внимание! Обнаружен посторонний пользователь. Система заблокирована."
+            caption="⚠️ Внимание! Обнаружен посторонний пользователь. Заблокировать ПК?"
         )
 
-        self.tts_thread.say("Обнаружен посторонний пользователь. Блокирую систему.")
-        SystemActions.lock_screen()
+        self.tts_thread.say("Внимание. Замечен посторонний.")
 
     def on_gesture_detected(self, gesture_name):
-        cfg = self.config if isinstance(self.config, dict) else (
-            SystemActions._load_config() if hasattr(SystemActions, '_load_config') else {}
-        )
+        cfg = load_config()
         if not cfg.get("modules", {}).get("gestures", False):
             return
 
@@ -1123,6 +1121,8 @@ class MainWindow(QWidget):
             SystemActions.media_play_pause()
         elif gesture_name == "fist":
             self.absence_start_time = time.time()
+            if self.presence_manager:
+                self.presence_manager.set_manual_absence(grace_period=10)
             SystemActions.lock_screen()
         elif gesture_name == "pointing":
             SystemActions.media_next_track()
@@ -1146,7 +1146,7 @@ class MainWindow(QWidget):
         if any(w in text_low for w in ["заблокируй", "залочь", "заблокировать", "залочить"]):
             self.absence_start_time = time.time()
             if self.presence_manager:
-                self.presence_manager.is_present = False
+                self.presence_manager.set_manual_absence(grace_period=10)
 
         self.voice_worker = CommandWorker(self.command_parser, text, audio_data=audio_data, is_voice=True, parent=self)
         self.voice_worker.result_ready.connect(self.on_voice_command_finished)
@@ -1206,7 +1206,7 @@ class MainWindow(QWidget):
             if any(w in text_low for w in ["заблокируй", "залочь", "заблокировать", "залочить"]):
                 self.absence_start_time = time.time()
                 if self.presence_manager:
-                    self.presence_manager.is_present = False
+                    self.presence_manager.set_manual_absence(grace_period=10)
 
             self.input_field.clear()
             self.input_field.setEnabled(False)

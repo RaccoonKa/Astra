@@ -6,7 +6,7 @@ import requests
 from packaging import version
 from PyQt6.QtCore import QThread, pyqtSignal
 
-CURRENT_VERSION = "2.0.0"
+CURRENT_VERSION = "2.2.0"
 GITHUB_REPO = "RaccoonKa/Astra"
 
 

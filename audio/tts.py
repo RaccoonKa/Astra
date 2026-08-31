@@ -102,7 +102,7 @@ class TTSThread(QThread):
         self.model_path = model_path if model_path else DEFAULT_MODEL_PATH
         self.text_to_speak = ""
         self.speaker = 'kseniya'
-        self.sample_rate = 48000
+        self.sample_rate = 24000
         self._stopped = False
         self._is_warmup = False
         self._play_cached_flag = False
@@ -114,7 +114,7 @@ class TTSThread(QThread):
     def _init_model(self):
         if self.model is None and os.path.exists(self.model_path):
             try:
-                torch.set_num_threads(4)
+                torch.set_num_threads(2)
                 importer = torch.package.PackageImporter(self.model_path)
                 self.model = importer.load_pickle("tts_models", "model")
                 self.model.to(self.device)

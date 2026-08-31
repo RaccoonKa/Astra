@@ -929,6 +929,7 @@ class SettingsFrame(QFrame):
         self.rest_apps_input.setText(", ".join(r_apps) if isinstance(r_apps, list) else str(r_apps))
 
         self.tg_token_input.setText(api_keys.get("telegram_token", ""))
+        self.saved_tg_token = api_keys.get("telegram_token", "")
         self.gigachat_input.setText(api_keys.get("gigachat", ""))
         self.yandex_input.setText(api_keys.get("yandex_music_token", ""))
         self.yandex_iot_input.setText(api_keys.get("yandex_iot_token", ""))
@@ -1036,7 +1037,9 @@ class SettingsFrame(QFrame):
             self.status_label.setStyleSheet("color: #ffd700; font-size: 11px; font-weight: bold;")
             QTimer.singleShot(2500, lambda: self.status_label.setText(""))
 
-            self.telegram_config_changed.emit()
+            if tg_token_val != getattr(self, 'saved_tg_token', ''):
+                self.saved_tg_token = tg_token_val
+                self.telegram_config_changed.emit()
 
             if any_vision_on and not self.saved_vision_state:
                 self.speak_requested.emit("Подожди чуточку!")

@@ -17,8 +17,8 @@ def get_hand_model_path():
         project_dir = os.path.dirname(os.path.dirname(script_dir))
 
     candidate_paths = [
-        os.path.join(project_dir, "optimized_models", "hand_landmaker", "hand_landmarker.task"),
         os.path.join(project_dir, "optimized_models", "hand_landmarker", "hand_landmarker.task"),
+        os.path.join(project_dir, "optimized_models", "hand_landmaker", "hand_landmarker.task"),
         os.path.join(project_dir, "optimized_models", "hand_landmarker.task")
     ]
 
@@ -26,7 +26,7 @@ def get_hand_model_path():
         if os.path.exists(p) and os.path.getsize(p) >= 5000000:
             return p
 
-    models_dir = os.path.join(project_dir, "optimized_models", "hand_landmaker")
+    models_dir = os.path.join(project_dir, "optimized_models", "hand_landmarker")
     os.makedirs(models_dir, exist_ok=True)
     model_path = os.path.join(models_dir, "hand_landmarker.task")
 
@@ -43,21 +43,21 @@ class GestureDetector:
     def __init__(self):
         model_path = get_hand_model_path()
         if not os.path.exists(model_path) or os.path.getsize(model_path) < 5000000:
-            raise FileNotFoundError("Модель hand_landmarker.task не загружена или повреждена.")
+            raise FileNotFoundError("Модель hand_landmarker.task не найдена.")
 
         base_options = python.BaseOptions(model_asset_path=model_path)
         options = vision.HandLandmarkerOptions(
             base_options=base_options,
             running_mode=vision.RunningMode.IMAGE,
             num_hands=1,
-            min_hand_detection_confidence=0.6,
-            min_hand_presence_confidence=0.6
+            min_hand_detection_confidence=0.55,
+            min_hand_presence_confidence=0.55
         )
         self.detector = vision.HandLandmarker.create_from_options(options)
-        self.clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        self.clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
 
-    def _enhance_light(self, small_bgr):
-        lab = cv2.cvtColor(small_bgr, cv2.COLOR_BGR2LAB)
+    def _enhance_light_to_rgb(self, bgr_img):
+        lab = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
         l = self.clahe.apply(l)
         enhanced_lab = cv2.merge((l, a, b))
@@ -71,8 +71,7 @@ class GestureDetector:
             return None
 
         try:
-            enhanced_frame = self._enhance_light(frame_bgr)
-            frame_rgb = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2RGB)
+            frame_rgb = self._enhance_light_to_rgb(frame_bgr)
             frame_rgb = np.ascontiguousarray(frame_rgb, dtype=np.uint8)
 
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)

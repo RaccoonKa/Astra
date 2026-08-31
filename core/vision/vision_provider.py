@@ -16,6 +16,7 @@ class VisionThread(QThread):
         super().__init__(parent)
         self.camera_index = camera_index
         self.is_running = True
+        self.current_frame = None
 
         self.gesture_detector = None
         self.eye_detector = None
@@ -51,6 +52,18 @@ class VisionThread(QThread):
             if self.frame_counter % 30 == 0:
                 self._update_modules_config()
 
+            is_astra_busy = False
+            main_win = self.parent()
+            if main_win and hasattr(main_win, 'tts_thread'):
+                if main_win.tts_thread.isRunning():
+                    is_astra_busy = True
+
+            if is_astra_busy:
+                if cap is not None and cap.isOpened():
+                    cap.read()
+                self.msleep(100)
+                continue
+
             face_rec_enabled = self.cached_modules.get("face_recognition", self.cached_modules.get("vision", False))
             eye_enabled = self.cached_modules.get("eye_tracking", self.cached_modules.get("vision", False))
             gestures_enabled = self.cached_modules.get("gestures", False)
@@ -60,8 +73,15 @@ class VisionThread(QThread):
                     cap.release()
                     cap = None
 
-                self.eye_detector = None
-                self.gesture_detector = None
+                if self.eye_detector is not None:
+                    if hasattr(self.eye_detector, 'detector'):
+                        self.eye_detector.detector.close()
+                    self.eye_detector = None
+
+                if self.gesture_detector is not None:
+                    if hasattr(self.gesture_detector, 'detector'):
+                        self.gesture_detector.detector.close()
+                    self.gesture_detector = None
 
                 self.msleep(500)
                 continue
@@ -73,6 +93,8 @@ class VisionThread(QThread):
                 except Exception:
                     pass
             elif not eye_enabled and self.eye_detector is not None:
+                if hasattr(self.eye_detector, 'detector'):
+                    self.eye_detector.detector.close()
                 self.eye_detector = None
 
             if gestures_enabled and self.gesture_detector is None:
@@ -82,6 +104,8 @@ class VisionThread(QThread):
                 except Exception:
                     pass
             elif not gestures_enabled and self.gesture_detector is not None:
+                if hasattr(self.gesture_detector, 'detector'):
+                    self.gesture_detector.detector.close()
                 self.gesture_detector = None
 
             if cap is None or not cap.isOpened():
@@ -96,9 +120,16 @@ class VisionThread(QThread):
 
             ret, frame = cap.read()
             if not ret or frame is None or frame.size == 0:
-                self.msleep(20)
+                self.msleep(60)
                 continue
 
+            if self.current_frame is not None and np.array_equal(frame, self.current_frame):
+                self.last_face_found = False
+                self.last_is_owner = False
+                self.msleep(60)
+                continue
+
+            self.current_frame = frame.copy()
             self.frame_counter += 1
             now = time.time()
 
@@ -145,14 +176,13 @@ class VisionThread(QThread):
             if face_rec_enabled:
                 presence_mgr = getattr(self.parent(), 'presence_manager', None)
                 if presence_mgr:
-                    if self.frame_counter % 15 == 0:
+                    if self.frame_counter % 30 == 0:
                         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         f_found, i_owner = presence_mgr.verify_faces(frame_rgb)
                         self.last_face_found = f_found
                         self.last_is_owner = i_owner
 
-                    emit_face = fast_face_found if eye_enabled else self.last_face_found
-                    self.face_detected_signal.emit(emit_face, self.last_is_owner)
+                    self.face_detected_signal.emit(self.last_face_found, self.last_is_owner)
             elif eye_enabled:
                 self.face_detected_signal.emit(fast_face_found, True)
 
@@ -168,8 +198,7 @@ class VisionThread(QThread):
                     elif not gesture:
                         self.last_gesture = None
 
-            self.frame_processed.emit(frame)
-            self.msleep(20)
+            self.msleep(100)
 
         if cap is not None and cap.isOpened():
             cap.release()
@@ -177,3 +206,13 @@ class VisionThread(QThread):
     def stop(self):
         self.is_running = False
         self.wait()
+
+        if getattr(self, 'gesture_detector', None) is not None:
+            if hasattr(self.gesture_detector, 'detector'):
+                self.gesture_detector.detector.close()
+            self.gesture_detector = None
+
+        if getattr(self, 'eye_detector', None) is not None:
+            if hasattr(self.eye_detector, 'detector'):
+                self.eye_detector.detector.close()
+            self.eye_detector = None
