@@ -16,7 +16,7 @@ from PyQt6.QtGui import (
     QPainter, QPen, QColor, QLinearGradient, QBrush, QPainterPath,
     QFont, QFontDatabase
 )
-from core.utils.config import load_config, save_config, get_user_data_path, get_resource_path
+from core.utils.config import load_config, save_config, get_user_data_path, get_resource_path, USER_DATA_DIR
 from core.utils.updater import CURRENT_VERSION, DownloaderThread, apply_update_and_restart
 
 SPEECH_HINTS = {
@@ -25,7 +25,6 @@ SPEECH_HINTS = {
     "user_gender": "Выбери свой пол, чтобы я правильно обращалась к тебе и никогда не путала окончания слов!",
     "vpn_service": "Выбери, какую виртуальную сеть ты используешь! Я смогу автоматически запускать и переключать её по голосовой команде.",
     "telegram_pair": "Включив эту функцию, я смогу дистанционно управлять твоим компьютером или просто общаться с тобой прямо в телеграме! Смогу управлять твоей камерой, питанием, статусом компьютера.",
-    "telegram_token": "Вставь сюда токен своего личного бота из BotFather, чтобы я могла подключиться к нему и выполнять твои команды дистанционно!",
     "face_recognition": "Если включишь эту функцию, я буду узнавать тебя в лицо! Смогу радостно здороваться при твоем возвращении и защищать систему от чужих глаз.",
     "eye_tracking": "С этой функцией я смогу следить за твоими глазками. Если замечу, что часто моргаешь или долго сидишь с закрытыми глазами — я заботливо предложу отдохнуть!",
     "gestures": "С жестами я смогу понимать тебя без слов! Покажешь кулак — заблокирую твой компьютер, чтобы никто не получил к нему доступ кроме тебя. Покажешь ладонь — поставлю музыку на паузу. Почти магия!",
@@ -44,19 +43,10 @@ SPEECH_HINTS = {
 API_GUIDES = {
     "telegram_pair": {
         "title": "Как привязать Telegram-бота",
-        "text": "1. Сначала укажи токен бота в блоке 'API Ключи' ниже и нажми 'Сохранить'.\n"
-                "2. Нажми кнопку 'QR-код' рядом.\n"
-                "3. Отсканируй появившийся QR-код камерой телефона или нажми 'Открыть в Telegram'.\n"
-                "4. В открывшемся диалоге нажми кнопку 'Старт' (Start).\n"
-                "5. Астра автоматически сохранит твой профиль и привяжет пульт управления к твоему аккаунту!"
-    },
-    "telegram_token": {
-        "title": "Как создать своего Telegram-бота",
-        "text": "1. Открой Telegram и найди официального бота @BotFather.\n"
-                "2. Отправь команду /newbot.\n"
-                "3. Введи отображаемое имя (например: Моя Астра) и юзернейм (например: my_astra_helper_bot — обязательно заканчивается на bot).\n"
-                "4. Скопируй полученный длинный токен (HTTP API Token) и вставь его в это поле.\n"
-                "5. Нажми кнопку 'Сохранить' внизу настроек!"
+        "text": "1. Нажми кнопку 'QR-код' в настройках системы.\n"
+                "2. Отсканируй появившийся QR-код камерой телефона или нажми 'Открыть в Telegram'.\n"
+                "3. В открывшемся диалоге нажми кнопку 'Старт' (Start).\n"
+                "4. Астра автоматически сохранит твой профиль и привяжет пульт управления к твоему аккаунту!"
     },
     "gigachat": {
         "title": "Как получить ключ GigaChat API",
@@ -356,7 +346,6 @@ class ModernToggle(QWidget):
 class SettingsFrame(QFrame):
     speak_requested = pyqtSignal(str)
     vision_state_changed = pyqtSignal(bool)
-    telegram_config_changed = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -376,7 +365,7 @@ class SettingsFrame(QFrame):
         self.custom_font = QFont(self.font_family, 11)
         self.setFont(self.custom_font)
 
-        self.google_creds_path = get_user_data_path("google", "credentials.json")
+        self.google_creds_path = os.path.join(USER_DATA_DIR, "google", "credentials.json")
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate_border)
@@ -690,11 +679,6 @@ class SettingsFrame(QFrame):
         lbl_keys.setFont(QFont(self.font_family, 11, QFont.Weight.Bold))
         layout_keys.addWidget(lbl_keys)
 
-        box_tg, self.tg_token_input = self._create_field_block(
-            "API Токен Telegram-бота:", "Вставьте токен от @BotFather...", "telegram_token", "telegram_token"
-        )
-        layout_keys.addLayout(box_tg)
-
         box_giga, self.gigachat_input = self._create_field_block(
             "API ключ GigaChat:", "Вставьте ключ GigaChat...", "gigachat", "gigachat"
         )
@@ -928,8 +912,6 @@ class SettingsFrame(QFrame):
         r_apps = cfg.get("rest_apps", [])
         self.rest_apps_input.setText(", ".join(r_apps) if isinstance(r_apps, list) else str(r_apps))
 
-        self.tg_token_input.setText(api_keys.get("telegram_token", ""))
-        self.saved_tg_token = api_keys.get("telegram_token", "")
         self.gigachat_input.setText(api_keys.get("gigachat", ""))
         self.yandex_input.setText(api_keys.get("yandex_music_token", ""))
         self.yandex_iot_input.setText(api_keys.get("yandex_iot_token", ""))
@@ -991,9 +973,6 @@ class SettingsFrame(QFrame):
         rest_raw = self.rest_apps_input.text().strip()
         config_data["rest_apps"] = [x.strip() for x in rest_raw.split(",") if x.strip()] if rest_raw else []
 
-        tg_token_val = self.tg_token_input.text().strip()
-        config_data["api_keys"]["telegram_token"] = tg_token_val
-
         gigachat_key = self.gigachat_input.text().strip()
         config_data["api_keys"]["gigachat"] = gigachat_key
         config_data["api_keys"]["yandex_music_token"] = self.yandex_input.text().strip()
@@ -1003,7 +982,7 @@ class SettingsFrame(QFrame):
         config_data["api_keys"]["weather"] = self.weather_input.text().strip()
 
         config_data["modules"]["gigachat"] = bool(gigachat_key)
-        config_data["modules"]["telegram"] = bool(tg_token_val)
+        config_data["modules"]["telegram"] = bool(config_data["api_keys"].get("telegram_admin_id", 0))
 
         hdrezka_domain = self.hdrezka_input.text().strip()
         config_data["hdrezka_domain"] = hdrezka_domain if hdrezka_domain else "https://ru1.hdreskaz.top"
@@ -1036,10 +1015,6 @@ class SettingsFrame(QFrame):
             self.status_label.setText("✓ Сохранено")
             self.status_label.setStyleSheet("color: #ffd700; font-size: 11px; font-weight: bold;")
             QTimer.singleShot(2500, lambda: self.status_label.setText(""))
-
-            if tg_token_val != getattr(self, 'saved_tg_token', ''):
-                self.saved_tg_token = tg_token_val
-                self.telegram_config_changed.emit()
 
             if any_vision_on and not self.saved_vision_state:
                 self.speak_requested.emit("Подожди чуточку!")

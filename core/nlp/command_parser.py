@@ -384,7 +384,7 @@ class CommandParser:
             "депресняк", "убейте меня", "ну я и дурак", "капец я дурак"
         ]
         for cp in chat_phrases:
-            if cp in text_low:
+            if re.search(r'\b' + re.escape(cp) + r'\b', text_low):
                 return "chat"
 
         chat_roots = ["пожен", "жениз", "замуж", "целу", "обним", "свадьб", "нравиш"]
@@ -402,6 +402,10 @@ class CommandParser:
         ]
         if any(trig in text_low for trig in my_wave_triggers):
             return "play_yandex_favorites"
+
+        weather_triggers = ["погод", "температур", "сколько градусов", "какой прогноз"]
+        if any(wt in text_low for wt in weather_triggers):
+            return "get_weather"
 
         unlike_keywords = ["убери лайк", "удали лайк", "дизлайк", "дизлайкни", "убери из любимого", "удали из любимого",
                            "сними лайк"]

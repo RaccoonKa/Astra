@@ -1,94 +1,33 @@
 import os
-import json
-import tempfile
 import threading
+import base64
 import cv2
-import requests
-from core.utils.config import load_config
+from services.telegram.telegram_bot import send_alert_to_server, send_text_to_server
 
-
-def _send_photo_worker(frame_or_path, caption: str, with_keyboard: bool = True):
-    temp_file = None
+def _send_photo_worker(frame_or_path, caption: str):
     try:
-        cfg = load_config()
-
-        token = cfg.get("api_keys", {}).get("telegram_token", "")
-        admin_id = cfg.get("api_keys", {}).get("telegram_admin_id", 0)
-
-        if not token or not admin_id:
-            return
-
-        photo_path = None
-        if isinstance(frame_or_path, str):
-            photo_path = frame_or_path
+        base64_img = ""
+        if isinstance(frame_or_path, str) and os.path.exists(frame_or_path):
+            with open(frame_or_path, "rb") as f:
+                base64_img = base64.b64encode(f.read()).decode("utf-8")
         elif frame_or_path is not None:
-            temp_file = os.path.join(tempfile.gettempdir(), "temp_intruder.png")
-            cv2.imwrite(temp_file, frame_or_path)
-            photo_path = temp_file
+            _, buffer = cv2.imencode(".png", frame_or_path)
+            base64_img = base64.b64encode(buffer.tobytes()).decode("utf-8")
         else:
-            cap = cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
             ret, frame = cap.read()
             cap.release()
             if ret:
-                temp_file = os.path.join(tempfile.gettempdir(), "temp_intruder.png")
-                cv2.imwrite(temp_file, frame)
-                photo_path = temp_file
+                _, buffer = cv2.imencode(".png", frame)
+                base64_img = base64.b64encode(buffer.tobytes()).decode("utf-8")
 
-        if photo_path and os.path.exists(photo_path):
-            url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            payload = {"chat_id": admin_id, "caption": caption}
-
-            if with_keyboard:
-                reply_markup = {
-                    "inline_keyboard": [
-                        [
-                            {"text": "Заблокировать", "callback_data": "security_lock"},
-                            {"text": "Не блокировать", "callback_data": "security_ignore"}
-                        ]
-                    ]
-                }
-                payload["reply_markup"] = json.dumps(reply_markup)
-
-            with open(photo_path, "rb") as p_file:
-                requests.post(
-                    url,
-                    data=payload,
-                    files={"photo": p_file},
-                    timeout=10
-                )
+        if base64_img:
+            send_alert_to_server(base64_img, caption)
     except Exception as e:
-        print(f"[Telegram Security Alert Error]: {e}")
-    finally:
-        if temp_file and os.path.exists(temp_file):
-            try:
-                os.remove(temp_file)
-            except Exception:
-                pass
+        print(f"[Notifier Error]: {e}")
 
-
-def send_security_alert(frame_or_path=None, caption="⚠️ Замечен посторонний пользователь! Заблокировать ПК?"):
-    threading.Thread(target=_send_photo_worker, args=(frame_or_path, caption, True), daemon=True).start()
-
+def send_security_alert(frame_or_path=None, caption="⚠️ Внимание! Замечен посторонний пользователь. Заблокировать ПК?"):
+    threading.Thread(target=_send_photo_worker, args=(frame_or_path, caption), daemon=True).start()
 
 def send_telegram_notification(text: str):
-    def _worker():
-        try:
-            cfg = load_config()
-
-            token = cfg.get("api_keys", {}).get("telegram_token", "")
-            admin_id = cfg.get("api_keys", {}).get("telegram_admin_id", 0)
-
-            if not token or not admin_id:
-                return
-
-            url = f"https://api.telegram.org/bot{token}/sendMessage"
-            payload = {
-                "chat_id": admin_id,
-                "text": text,
-                "parse_mode": "Markdown"
-            }
-            requests.post(url, json=payload, timeout=10)
-        except Exception as e:
-            print(f"[Telegram Notification Error]: {e}")
-
-    threading.Thread(target=_worker, daemon=True).start()
+    threading.Thread(target=send_text_to_server, args=(text,), daemon=True).start()

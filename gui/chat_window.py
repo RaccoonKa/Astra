@@ -708,8 +708,7 @@ class MainWindow(QWidget):
         QTimer.singleShot(3000, self._check_updates)
 
     def _start_telegram_delayed(self):
-        cfg_keys = self.config.get("api_keys", {}) if isinstance(self.config, dict) else {}
-        if cfg_keys.get("telegram_token") and self.telegram_thread is None:
+        if self.telegram_thread is None:
             self.telegram_thread = TelegramBotThread(parent=self)
             self.telegram_thread.start()
 
@@ -727,16 +726,6 @@ class MainWindow(QWidget):
         if not (self.settings_panel.isVisible() and self.settings_panel.maximumWidth() > 0):
             self.toggle_settings()
         self.settings_panel.scroll_to_bottom()
-
-    def restart_telegram_bot(self):
-        if hasattr(self, 'telegram_thread') and self.telegram_thread and self.telegram_thread.isRunning():
-            self.telegram_thread.stop()
-            self.telegram_thread = None
-
-        cfg = load_config()
-        if cfg.get("api_keys", {}).get("telegram_token"):
-            self.telegram_thread = TelegramBotThread(parent=self)
-            self.telegram_thread.start()
 
     def init_ui(self):
         font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
@@ -852,7 +841,6 @@ class MainWindow(QWidget):
         self.settings_panel.hide()
         self.settings_panel.speak_requested.connect(self.speak_reply)
         self.settings_panel.vision_state_changed.connect(self.on_vision_state_changed)
-        self.settings_panel.telegram_config_changed.connect(self.restart_telegram_bot)
         container_layout.addWidget(self.settings_panel)
 
         self.right_panel = ChatFrame()
@@ -997,9 +985,13 @@ class MainWindow(QWidget):
         self.toggle_chat_btn.setEnabled(enabled)
 
     def exit_app(self):
-        self.shutdown()
-        from PyQt6.QtWidgets import QApplication
-        QApplication.instance().quit()
+        self.hide()
+        if hasattr(self, 'ducker'):
+            try:
+                self.ducker._restore_async()
+            except Exception:
+                pass
+        os._exit(0)
 
     def init_audio(self):
         self.stt_thread = STTThread(parent=self)

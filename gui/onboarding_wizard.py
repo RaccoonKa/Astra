@@ -544,7 +544,7 @@ class OnboardingWizard(QDialog):
             return row, toggle
 
         r1, self.tg_toggle = make_row("Телеграм-пульт управления",
-                                      self.config.get("api_keys", {}).get("telegram_token") != "")
+                                      self.config.get("api_keys", {}).get("telegram_admin_id", 0) != 0)
         r2, self.face_toggle = make_row("Распознавание владельца (Face ID)", mods.get("face_recognition", False))
 
         self.add_face_btn_wizard = QPushButton("📸 Загрузить моё фото")

@@ -4,7 +4,6 @@ import time
 import json
 import uuid
 import qrcode
-import requests
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
@@ -13,7 +12,11 @@ from PyQt6.QtCore import Qt, QTimer, QRectF, QPoint, QUrl
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QPainterPath, QFont, QPixmap, QDesktopServices
 )
-from core.utils.config import get_user_data_path, load_config
+from core.utils.config import get_user_data_path
+from services.telegram.telegram_bot import register_pairing_token
+
+
+BOT_USERNAME = "astr0chka_bot"
 
 
 class TelegramPairDialog(QDialog):
@@ -21,20 +24,6 @@ class TelegramPairDialog(QDialog):
         super().__init__(parent)
         self.font_family = font_family
         self.drag_position = QPoint()
-
-        cfg = load_config()
-        self.bot_token = cfg.get("api_keys", {}).get("telegram_token", "").strip()
-        self.bot_username = ""
-
-        if self.bot_token:
-            try:
-                resp = requests.get(f"https://api.telegram.org/bot{self.bot_token}/getMe", timeout=5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    self.bot_username = data.get("result", {}).get("username", "")
-            except Exception:
-                pass
-
         self.session_path = Path(get_user_data_path("pairing_session.json"))
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
@@ -42,18 +31,17 @@ class TelegramPairDialog(QDialog):
         self.setFixedSize(380, 500)
 
         self.token = uuid.uuid4().hex[:10]
-        self.link = f"https://t.me/{self.bot_username}?start={self.token}" if self.bot_username else ""
+        self.link = f"https://t.me/{BOT_USERNAME}?start={self.token}"
         self.expires_at = time.time() + 180
 
-        if self.bot_username:
-            self._init_session_file()
+        self._init_session_file()
+        register_pairing_token(self.token, self.expires_at)
 
         self.init_ui()
 
-        if self.bot_username:
-            self.poll_timer = QTimer(self)
-            self.poll_timer.timeout.connect(self._check_pairing_status)
-            self.poll_timer.start(1000)
+        self.poll_timer = QTimer(self)
+        self.poll_timer.timeout.connect(self._check_pairing_status)
+        self.poll_timer.start(1000)
 
     def _init_session_file(self):
         os.makedirs(self.session_path.parent, exist_ok=True)
@@ -85,34 +73,7 @@ class TelegramPairDialog(QDialog):
         header.addWidget(close_btn)
         layout.addLayout(header)
 
-        if not self.bot_token or not self.bot_username:
-            warn_lbl = QLabel("⚠️ Токен бота не найден или некорректен!\n\nСначала укажи токен от @BotFather в блоке 'API Ключи', нажми 'Сохранить', а затем открой это окно.")
-            warn_lbl.setFont(QFont(self.font_family, 10))
-            warn_lbl.setWordWrap(True)
-            warn_lbl.setStyleSheet("color: #ffd700; line-height: 1.4;")
-            layout.addWidget(warn_lbl)
-            layout.addStretch()
-
-            ok_btn = QPushButton("Понятно")
-            ok_btn.setFont(QFont(self.font_family, 10, QFont.Weight.Bold))
-            ok_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            ok_btn.setFixedHeight(32)
-            ok_btn.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ede8db, stop:1 #d6cebe);
-                    color: #121008;
-                    border: none;
-                    border-radius: 6px;
-                }
-                QPushButton:hover {
-                    background: #ffffff;
-                }
-            """)
-            ok_btn.clicked.connect(self.reject)
-            layout.addWidget(ok_btn)
-            return
-
-        desc_lbl = QLabel(f"Бот: @{self.bot_username}\nОтсканируй QR-код телефоном или перейди по кнопке:")
+        desc_lbl = QLabel(f"Отсканируй QR-код камерой смартфона или нажми кнопку для перехода в бота:")
         desc_lbl.setFont(QFont(self.font_family, 10))
         desc_lbl.setWordWrap(True)
         desc_lbl.setStyleSheet("color: #fffde7;")
@@ -169,7 +130,6 @@ class TelegramPairDialog(QDialog):
         qr.make(fit=True)
 
         img = qr.make_image(fill_color="#ffd700", back_color="#080805")
-
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
 

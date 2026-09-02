@@ -25,7 +25,6 @@ import sys
 import ctypes
 import certifi
 
-# Глушим безобидное предупреждение PyQt6 о DPI на Windows
 os.environ["QT_LOGGING_RULES"] = "qt.qpa.window=false"
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()

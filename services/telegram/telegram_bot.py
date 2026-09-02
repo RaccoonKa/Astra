@@ -1,69 +1,41 @@
 import asyncio
-import certifi
-import os
+import base64
+import io
+import json
+import subprocess
 import sys
 import time
-import json
-import wave
-import tempfile
-import subprocess
+import uuid
 from pathlib import Path
-import psutil
-import cv2
-import pyautogui
-import torch
-import soundfile as sf
-import sounddevice as sd
-import numpy as np
-import vosk
-from aiogram import Bot, Dispatcher, Router, F, types
-from aiogram.filters import Command, CommandObject
-from aiogram.types import FSInputFile, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.client.session.aiohttp import AiohttpSession
-from PyQt6.QtCore import QThread
 
-os.environ["SSL_CERT_FILE"] = certifi.where()
-os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+import cv2
+import psutil
+import pyautogui
+import websockets
+from PyQt6.QtCore import QThread
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from core.utils.config import load_config, save_config, get_user_data_path, get_resource_path
 from core.nlp.command_parser import CommandParser
-from core.nlp.asr_corrector import ASRCorrector
+from core.utils.config import get_user_data_path, load_config, save_config
 
+SERVER_HOST = "185.79.139.120:8000"
 PAIRING_PATH = Path(get_user_data_path("pairing_session.json"))
-VOSK_MODEL_PATH = Path(get_resource_path("optimized_models", "model_vosk"))
-SILERO_PATH = Path(get_resource_path("optimized_models", "silero_tts", "v4_ru.pt"))
 
-router = Router()
-current_bot_instance = None
+main_window_instance = None
 command_parser_instance = None
-corrector_instance = None
-vosk_model_instance = None
-silero_model_instance = None
-main_window_instance = None  # Глобальная ссылка на интерфейс Астры
+active_ws_client = None
 
-ERROR_UNREACHABLE_MSG = (
-    "Я потеряла контакт с твоим ноутом 🥺\n"
-    "Сигнал улетел в космос, попробуй чуть позже!"
-)
-
-main_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="Скриншот"), KeyboardButton(text="Веб-камера")],
-        [KeyboardButton(text="Статус ПК"), KeyboardButton(text="Заблокировать ПК")],
-        [KeyboardButton(text="Перезагрузить ПК"), KeyboardButton(text="Выключить ПК")]
-    ],
-    resize_keyboard=True
-)
-
-
-def get_admin_id() -> int:
+def get_device_uuid() -> str:
     cfg = load_config()
-    return int(cfg.get("api_keys", {}).get("telegram_admin_id", 0))
-
+    dev_id = cfg.get("device_uuid")
+    if not dev_id:
+        dev_id = str(uuid.uuid4())
+        cfg["device_uuid"] = dev_id
+        save_config(cfg)
+    return dev_id
 
 def get_command_parser():
     global command_parser_instance
@@ -71,59 +43,13 @@ def get_command_parser():
         command_parser_instance = CommandParser()
     return command_parser_instance
 
-
-def get_corrector():
-    global corrector_instance
-    if corrector_instance is None:
-        corrector_instance = ASRCorrector()
-    return corrector_instance
-
-
-def get_vosk_model():
-    global vosk_model_instance
-    if vosk_model_instance is None and VOSK_MODEL_PATH.exists():
-        vosk.SetLogLevel(-1)
-        vosk_model_instance = vosk.Model(str(VOSK_MODEL_PATH))
-    return vosk_model_instance
-
-
-def get_silero_model():
-    global silero_model_instance
-    if silero_model_instance is None and SILERO_PATH.exists():
-        try:
-            torch.set_num_threads(4)
-            importer = torch.package.PackageImporter(str(SILERO_PATH))
-            silero_model_instance = importer.load_pickle("tts_models", "model")
-            silero_model_instance.to(torch.device("cpu"))
-        except Exception as e:
-            print(f"[Silero Load Error]: {e}")
-    return silero_model_instance
-
-
-def play_audio_on_pc(text: str):
-    model = get_silero_model()
-    if not model or not text.strip():
-        return
-    try:
-        cleaned = text.replace("*", "").replace("#", "").replace("`", "").strip()
-        with torch.inference_mode():
-            audio = model.apply_tts(text=cleaned, speaker="kseniya", sample_rate=48000)
-        audio_np = audio.numpy()
-        padding = np.zeros(int(48000 * 0.2), dtype=np.float32)
-        audio_padded = np.concatenate([audio_np, padding])
-        sd.play(audio_padded, 48000)
-        sd.wait()
-    except Exception as e:
-        print(f"[PC Audio Error]: {e}")
-
-
 def get_hardware_status() -> str:
     cpu_usage = psutil.cpu_percent(interval=0.3)
     cpu_count = psutil.cpu_count(logical=True)
 
     ram = psutil.virtual_memory()
-    ram_used = ram.used / (1024 ** 3)
-    ram_total = ram.total / (1024 ** 3)
+    ram_used = ram.used / (1024**3)
+    ram_total = ram.total / (1024**3)
     ram_percent = ram.percent
 
     disks_info = []
@@ -137,9 +63,9 @@ def get_hardware_status() -> str:
         seen_mounts.add(mount)
         try:
             usage = psutil.disk_usage(mount)
-            free_gb = usage.free / (1024 ** 3)
-            total_gb = usage.total / (1024 ** 3)
-            drive_clean = part.device.rstrip('\\').rstrip('/').rstrip(':')
+            free_gb = usage.free / (1024**3)
+            total_gb = usage.total / (1024**3)
+            drive_clean = part.device.rstrip("\\").rstrip("/").rstrip(":")
             disks_info.append(
                 f"💾 **Диск {drive_clean}:** {free_gb:.1f} ГБ свободно из {total_gb:.1f} ГБ ({usage.percent}%)"
             )
@@ -168,496 +94,158 @@ def get_hardware_status() -> str:
         f"{disks_str}"
     )
 
-
-def transcribe_audio_file(wav_path: str) -> str:
-    model = get_vosk_model()
-    if not model or not os.path.exists(wav_path):
-        return ""
-
-    wf = wave.open(wav_path, "rb")
-    rec = vosk.KaldiRecognizer(model, wf.getframerate())
-    rec.SetWords(True)
-
-    results = []
-    while True:
-        data = wf.readframes(4000)
-        if len(data) == 0:
-            break
-        if rec.AcceptWaveform(data):
-            part = json.loads(rec.Result())
-            if part.get("text"):
-                results.append(part["text"])
-
-    final_part = json.loads(rec.FinalResult())
-    if final_part.get("text"):
-        results.append(final_part["text"])
-    wf.close()
-
-    raw_text = " ".join(results).strip()
-    if not raw_text:
-        return ""
-
-    corrector = get_corrector()
-    return corrector.correct(raw_text)
-
-
-def synthesize_voice_file(text: str, output_path: str) -> bool:
-    model = get_silero_model()
-    if not model or not text.strip():
-        return False
-
-    try:
-        cleaned = text.replace("*", "").replace("#", "").replace("`", "").strip()
-        with torch.inference_mode():
-            audio = model.apply_tts(text=cleaned, speaker="kseniya", sample_rate=48000)
-        sf.write(output_path, audio.numpy(), 48000, format="OGG", subtype="OPUS")
-        return True
-    except Exception as e:
-        print(f"[Voice Synthesis Error]: {e}")
-        return False
-
-
-def check_and_pair_token(token_arg: str, user_id: int, user_name: str) -> bool:
-    if not PAIRING_PATH.exists():
-        return False
-
-    try:
-        with open(PAIRING_PATH, "r", encoding="utf-8") as f:
-            session = json.load(f)
-
-        valid_token = session.get("token")
-        expires_at = session.get("expires_at", 0)
-
-        if token_arg == valid_token and time.time() < expires_at:
-            current_cfg = load_config()
-            if "api_keys" not in current_cfg:
-                current_cfg["api_keys"] = {}
-            current_cfg["api_keys"]["telegram_admin_id"] = user_id
-            current_cfg["user_name"] = user_name
-            save_config(current_cfg)
-
-            session["status"] = "paired"
-            session["user_id"] = user_id
-            session["user_name"] = user_name
-            with open(PAIRING_PATH, "w", encoding="utf-8") as f:
-                json.dump(session, f, ensure_ascii=False, indent=4)
-
-            return True
-    except Exception as e:
-        print(f"[Pair Token Error]: {e}")
-    return False
-
-
-@router.message(Command("start"))
-async def cmd_start(message: types.Message, command: CommandObject):
-    admin_id = get_admin_id()
-    token_arg = command.args
-
-    if token_arg:
-        user_first_name = message.from_user.first_name or "друг"
-        if check_and_pair_token(token_arg.strip(), message.from_user.id, user_first_name):
-            await message.answer(
-                f"Устройство успешно привязано к профилю {user_first_name}! Теперь я могу управлять твоим ПК. ✨",
-                reply_markup=main_keyboard
-            )
-            return
-        else:
-            await message.answer("Срок действия ссылки истек или код привязки недействителен.")
-            return
-
-    if admin_id != 0 and message.from_user.id == admin_id:
-        await message.answer("Привет-привет! Рада тебя видеть! На связи и вся во внимании. 💛",
-                             reply_markup=main_keyboard)
-        return
-
-    await message.answer("Доступ запрещен. Открой мои настройки на компьютере и отсканируй QR-код для привязки.")
-
-
-@router.message(Command("say"))
-async def cmd_say(message: types.Message, command: CommandObject):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
-        return
-    phrase = command.args
-    if not phrase:
-        await message.answer("Укажи текст, например: `/say Привет, я дома!`", parse_mode="Markdown")
-        return
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, play_audio_on_pc, phrase)
-    await message.answer(f"📢 Сказала на компьютере: «{phrase}»")
-
-
-@router.message(Command("get"))
-async def cmd_get_file(message: types.Message, command: CommandObject):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
-        return
-    query = command.args
-    if not query:
-        await message.answer(
-            "Укажи имя файла или полный путь.\nНапример: `/get document.pdf` или `/get C:\\Games\\file.txt`",
-            parse_mode="Markdown")
-        return
-
-    raw_query = query.strip().strip('"').strip("'")
-    target_path = Path(raw_query)
-
-    if not target_path.is_absolute() or not target_path.exists():
-        search_dirs = [
-            Path.home() / "Downloads",
-            Path.home() / "Desktop",
-            Path.home() / "Documents",
-            ROOT_DIR
-        ]
-        found = None
-        for s_dir in search_dirs:
-            cand = s_dir / raw_query
-            if cand.exists() and cand.is_file():
-                found = cand
-                break
-        if found:
-            target_path = found
-
-    if not target_path.exists() or not target_path.is_file():
-        await message.answer(f"❌ Файл `{raw_query}` не найден на компьютере.", parse_mode="Markdown")
-        return
-
-    file_size_mb = target_path.stat().st_size / (1024 * 1024)
-    if file_size_mb > 49.5:
-        await message.answer(f"⚠️ Файл слишком большой ({file_size_mb:.1f} МБ). Максимальный размер файла — 50 МБ.")
-        return
-
-    try:
-        input_file = FSInputFile(str(target_path))
-        await message.answer_document(input_file, caption=f"📤 Файл с ПК: `{target_path.name}`", parse_mode="Markdown")
-    except Exception as e:
-        print(f"[Telegram Get File Error]: {e}")
-        await message.answer("Не удалось отправить файл 🥺")
-
-
-@router.callback_query(F.data == "security_lock")
-async def handle_security_lock(callback: types.CallbackQuery):
-    if callback.from_user.id != get_admin_id():
-        await callback.answer("Доступ запрещен!", show_alert=True)
-        return
-    try:
-        subprocess.run("rundll32.exe user32.dll,LockWorkStation", shell=True)
-        if callback.message:
-            await callback.message.edit_caption(
-                caption=f"{callback.message.caption or ''}\n\n🔒 Заблокировала твой ПК."
-            )
-        await callback.answer("ПК заблокирован!")
-    except Exception:
-        await callback.answer(ERROR_UNREACHABLE_MSG, show_alert=True)
-
-
-@router.callback_query(F.data == "security_ignore")
-async def handle_security_ignore(callback: types.CallbackQuery):
-    if callback.from_user.id != get_admin_id():
-        await callback.answer("Доступ запрещен!", show_alert=True)
-        return
-    if callback.message:
-        await callback.message.edit_caption(
-            caption=f"{callback.message.caption or ''}\n\n✅ Оставила доступ открытым!"
-        )
-    await callback.answer("Блокировка отменена.")
-
-
-@router.message(F.text == "Скриншот")
-async def handle_screen(message: types.Message):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
-        return
-    path = os.path.join(tempfile.gettempdir(), f"temp_screen_{int(time.time())}.png")
-    try:
-        pyautogui.screenshot(path)
-        photo = FSInputFile(path)
-        await message.answer_photo(photo, caption="Рабочий стол")
-    except Exception as e:
-        print(f"[Telegram Screenshot Error]: {e}")
-        await message.answer(ERROR_UNREACHABLE_MSG)
-    finally:
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
-
-
-@router.message(F.text == "Веб-камера")
-async def handle_cam(message: types.Message):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
-        return
-
-    path = os.path.join(tempfile.gettempdir(), f"temp_cam_{int(time.time())}.png")
-    try:
-        global main_window_instance
-        frame = None
-
-        if main_window_instance and getattr(main_window_instance, 'vision_thread', None):
-            if main_window_instance.vision_thread.isRunning():
-                frame = main_window_instance.vision_thread.current_frame
-
-        if frame is None:
-            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-            ret, frame_read = cap.read()
-            cap.release()
-            if ret and frame_read is not None:
-                frame = frame_read
-
-        if frame is not None:
-            cv2.imwrite(path, frame)
-            photo = FSInputFile(path)
-            await message.answer_photo(photo, caption="Снимок с веб-камеры 📷")
-        else:
-            await message.answer("Ой, не могу получить снимок... Возможно, камера занята другим приложением 📷")
-    except Exception as e:
-        print(f"[Telegram Camera Error]: {e}")
-        await message.answer(ERROR_UNREACHABLE_MSG)
-    finally:
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
-
-
-@router.message(F.text == "Статус ПК")
-async def handle_status(message: types.Message):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
-        return
-    try:
-        status_text = get_hardware_status()
-        await message.answer(status_text, parse_mode="Markdown")
-    except Exception as e:
-        print(f"[Telegram Status Error]: {e}")
-        await message.answer(ERROR_UNREACHABLE_MSG)
-
-
-@router.message(F.text == "Заблокировать ПК")
-async def handle_lock(message: types.Message):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
-        return
-    try:
-        subprocess.run("rundll32.exe user32.dll,LockWorkStation", shell=True)
-        await message.answer("Заблокировала твой ПК 🔒")
-    except Exception:
-        await message.answer(ERROR_UNREACHABLE_MSG)
-
-
-@router.message(F.text == "Перезагрузить ПК")
-async def handle_restart(message: types.Message):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
-        return
-    try:
-        await message.answer("Перезагружаю компьютер... 🔄")
-        subprocess.run("shutdown /r /t 5", shell=True)
-    except Exception:
-        await message.answer(ERROR_UNREACHABLE_MSG)
-
-
-@router.message(F.text == "Выключить ПК")
-async def handle_off(message: types.Message):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
-        return
-    try:
-        await message.answer("Выключаю ПК. До связи! 👋")
-        subprocess.run("shutdown /s /t 5", shell=True)
-    except Exception:
-        await message.answer(ERROR_UNREACHABLE_MSG)
-
-
-@router.message(F.document)
-async def handle_document_upload(message: types.Message, bot: Bot):
-    if message.from_user.id != get_admin_id():
-        return
-
-    doc = message.document
-    if not doc:
-        return
-
-    try:
-        downloads_dir = Path.home() / "Downloads"
-        downloads_dir.mkdir(parents=True, exist_ok=True)
-        file_name = doc.file_name or f"file_{int(time.time())}"
-        dest_path = downloads_dir / file_name
-
-        file = await bot.get_file(doc.file_id)
-        await bot.download_file(file.file_path, destination=dest_path)
-        await message.answer(f"📥 Файл **{file_name}** сохранён в папку `Загрузки`!", parse_mode="Markdown")
-    except Exception as e:
-        print(f"[Telegram File Upload Error]: {e}")
-        await message.answer("Не удалось сохранить файл на ПК 🥺")
-
-
-@router.message(F.voice)
-async def handle_voice_message(message: types.Message, bot: Bot):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Привяжи устройство через QR-код.")
-        return
-
-    temp_dir = tempfile.gettempdir()
-    raw_ogg = os.path.join(temp_dir, f"temp_voice_{message.message_id}.ogg")
-    wav_path = os.path.join(temp_dir, f"temp_voice_{message.message_id}.wav")
-    reply_voice_path = os.path.join(temp_dir, f"temp_reply_{message.message_id}.ogg")
-
-    try:
-        file = await bot.get_file(message.voice.file_id)
-        await bot.download_file(file.file_path, destination=raw_ogg)
-
-        cmd = ["ffmpeg", "-y", "-i", raw_ogg, "-ar", "16000", "-ac", "1", "-f", "wav", wav_path]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-
-        loop = asyncio.get_event_loop()
-        recognized_text = await loop.run_in_executor(None, transcribe_audio_file, wav_path)
-
-        if not recognized_text:
-            await message.answer("Не смогла разобрать слова на записи 🥺")
-            return
-
-        parser = get_command_parser()
-        response = await loop.run_in_executor(None, parser.process_command, recognized_text, None, True, None)
-
-        if isinstance(response, dict):
-            chat_text = response.get("chat", "") or response.get("voice", "")
-            voice_text = response.get("voice", "") or chat_text
-        else:
-            chat_text = voice_text = str(response)
-
-        await message.answer(f"*Распознано:* {recognized_text}\n\n💬 {chat_text}", parse_mode="Markdown")
-
-        has_voice = await loop.run_in_executor(None, synthesize_voice_file, voice_text, reply_voice_path)
-        if has_voice and os.path.exists(reply_voice_path):
-            voice_file = FSInputFile(reply_voice_path)
-            await message.answer_voice(voice_file)
-
-    except Exception as e:
-        print(f"[Telegram Voice Handler Error]: {e}")
-        await message.answer(ERROR_UNREACHABLE_MSG)
-    finally:
-        for p in [raw_ogg, wav_path, reply_voice_path]:
-            if os.path.exists(p):
-                try:
-                    os.remove(p)
-                except Exception:
-                    pass
-
-
-@router.message(F.text)
-async def handle_text_chat(message: types.Message):
-    if message.from_user.id != get_admin_id():
-        await message.answer("Доступ запрещен. Привяжи устройство через QR-код в настройках Астры.")
-        return
-
-    text = message.text.strip()
-    if not text:
-        return
-
-    try:
-        parser = get_command_parser()
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, parser.process_command, text, None, False, None)
-
-        if isinstance(response, dict):
-            chat_text = response.get("chat", "") or response.get("voice", "")
-        else:
-            chat_text = str(response)
-
-        if chat_text:
-            await message.answer(chat_text)
-    except Exception as e:
-        print(f"[Telegram Text Handler Error]: {e}")
-        await message.answer(ERROR_UNREACHABLE_MSG)
-
+def take_screenshot_base64() -> str:
+    shot = pyautogui.screenshot()
+    buf = io.BytesIO()
+    shot.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+def take_webcam_base64() -> str:
+    global main_window_instance
+    frame = None
+
+    if main_window_instance and getattr(main_window_instance, "vision_thread", None):
+        if main_window_instance.vision_thread.isRunning():
+            frame = main_window_instance.vision_thread.current_frame
+
+    if frame is None:
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        ret, frame_read = cap.read()
+        cap.release()
+        if ret and frame_read is not None:
+            frame = frame_read
+
+    if frame is not None:
+        _, buffer = cv2.imencode(".png", frame)
+        return base64.b64encode(buffer.tobytes()).decode("utf-8")
+    return ""
+
+def register_pairing_token(token: str, expires_at: float):
+    global active_ws_client
+    if active_ws_client and active_ws_client.ws and active_ws_client.loop and active_ws_client.loop.is_running():
+        payload = {"action": "register_token", "token": token, "expires_at": expires_at}
+        asyncio.run_coroutine_threadsafe(active_ws_client.ws.send(json.dumps(payload)), active_ws_client.loop)
+
+def send_alert_to_server(base64_img: str, caption: str):
+    global active_ws_client
+    if active_ws_client and active_ws_client.ws and active_ws_client.loop and active_ws_client.loop.is_running():
+        payload = {"action": "security_alert", "image_base64": base64_img, "caption": caption}
+        asyncio.run_coroutine_threadsafe(active_ws_client.ws.send(json.dumps(payload)), active_ws_client.loop)
+
+def send_text_to_server(text: str):
+    global active_ws_client
+    if active_ws_client and active_ws_client.ws and active_ws_client.loop and active_ws_client.loop.is_running():
+        payload = {"action": "text_notification", "text": text}
+        asyncio.run_coroutine_threadsafe(active_ws_client.ws.send(json.dumps(payload)), active_ws_client.loop)
 
 class TelegramBotThread(QThread):
     def __init__(self, parent=None):
         super().__init__(parent)
-        global main_window_instance
+        global main_window_instance, active_ws_client
         main_window_instance = parent
+        active_ws_client = self
         self.loop = None
-        self.bot = None
+        self.ws = None
         self._running = True
 
     def run(self):
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-        cfg = load_config()
-        token = cfg.get("api_keys", {}).get("telegram_token", "").strip()
-        if not token:
-            return
-
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-
-        session = AiohttpSession(timeout=60)
-        self.bot = Bot(token=token, session=session)
-
-        global current_bot_instance
-        current_bot_instance = self.bot
-
-        dp = Dispatcher()
-        dp.include_router(router)
-
-        async def _run_polling():
-            while self._running:
-                try:
-                    await dp.start_polling(self.bot, handle_signals=False, close_bot_session=True)
-                except asyncio.CancelledError:
-                    break
-                except Exception as e:
-                    print(f"[TELEGRAM BOT POLLING ERROR]: {e}")
-                    if not self._running:
-                        break
-                    await asyncio.sleep(4)
-
         try:
-            self.loop.run_until_complete(_run_polling())
-        except RuntimeError as e:
-            if "Event loop stopped before Future completed" not in str(e):
-                print(f"[TELEGRAM BOT THREAD ERROR]: {e}")
-        except Exception as e:
-            print(f"[TELEGRAM BOT THREAD ERROR]: {e}")
+            self.loop.run_until_complete(self._client_loop())
         finally:
-            try:
-                self.loop.run_until_complete(self.bot.session.close())
-            except Exception:
-                pass
             self.loop.close()
+
+    async def _client_loop(self):
+        device_id = get_device_uuid()
+        ws_url = f"ws://{SERVER_HOST}/ws/{device_id}"
+
+        while self._running:
+            try:
+                async with websockets.connect(ws_url, ping_interval=20, ping_timeout=20) as ws:
+                    self.ws = ws
+                    if PAIRING_PATH.exists():
+                        try:
+                            with open(PAIRING_PATH, "r", encoding="utf-8") as f:
+                                sess = json.load(f)
+                            if sess.get("status") == "pending" and time.time() < sess.get("expires_at", 0):
+                                await ws.send(json.dumps({
+                                    "action": "register_token",
+                                    "token": sess["token"],
+                                    "expires_at": sess["expires_at"]
+                                }))
+                        except Exception:
+                            pass
+
+                    while self._running:
+                        msg_text = await ws.recv()
+                        data = json.loads(msg_text)
+                        await self._handle_server_message(data)
+
+            except (websockets.ConnectionClosed, OSError):
+                self.ws = None
+                if not self._running: break
+                await asyncio.sleep(3)
+            except Exception:
+                self.ws = None
+                if not self._running: break
+                await asyncio.sleep(3)
+
+    async def _handle_server_message(self, data: dict):
+        action = data.get("action")
+        req_id = data.get("req_id")
+        payload = data.get("payload", {})
+
+        if action == "pairing_success":
+            user_id = data.get("user_id")
+            user_name = data.get("user_name")
+            cfg = load_config()
+            if "api_keys" not in cfg: cfg["api_keys"] = {}
+            cfg["api_keys"]["telegram_admin_id"] = user_id
+            cfg["user_name"] = user_name
+            save_config(cfg)
+            session_data = {"status": "paired", "user_id": user_id, "user_name": user_name}
+            with open(PAIRING_PATH, "w", encoding="utf-8") as f:
+                json.dump(session_data, f, ensure_ascii=False, indent=4)
+            return
+
+        resp_payload = {}
+        if action == "screenshot":
+            base64_img = await self.loop.run_in_executor(None, take_screenshot_base64)
+            resp_payload = {"image_base64": base64_img}
+        elif action == "webcam":
+            base64_img = await self.loop.run_in_executor(None, take_webcam_base64)
+            resp_payload = {"image_base64": base64_img}
+        elif action == "status":
+            st = await self.loop.run_in_executor(None, get_hardware_status)
+            resp_payload = {"text": st}
+        elif action == "lock":
+            subprocess.run("rundll32.exe user32.dll,LockWorkStation", shell=True)
+            resp_payload = {"text": "Заблокировала твой ПК 🔒"}
+        elif action == "restart":
+            subprocess.run("shutdown /r /t 5", shell=True)
+            resp_payload = {"text": "Перезагружаю компьютер... 🔄"}
+        elif action == "shutdown":
+            subprocess.run("shutdown /s /t 5", shell=True)
+            resp_payload = {"text": "Выключаю ПК. До связи! 👋"}
+        elif action == "chat":
+            text = payload.get("text", "")
+            parser = get_command_parser()
+            result = await self.loop.run_in_executor(None, parser.process_command, text, None, False, None)
+            if isinstance(result, dict):
+                reply_text = result.get("chat", "") or result.get("voice", "") or "Команда принята"
+            else:
+                reply_text = str(result)
+            resp_payload = {"text": reply_text}
+
+        if req_id and self.ws:
+            answer = {"req_id": req_id, "payload": resp_payload}
+            await self.ws.send(json.dumps(answer))
 
     def stop(self):
         self._running = False
         if self.loop and self.loop.is_running():
-            try:
-                self.loop.call_soon_threadsafe(self.loop.stop)
-            except Exception:
-                pass
+            self.loop.call_soon_threadsafe(self.loop.stop)
         self.wait(3000)
-
-
-async def main():
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-    cfg = load_config()
-    token = cfg.get("api_keys", {}).get("telegram_token", "")
-    if not token:
-        print("[TELEGRAM BOT]: Токен бота не указан в config.json!")
-        return
-
-    session = AiohttpSession(timeout=60)
-    bot = Bot(token=token, session=session)
-
-    dp = Dispatcher()
-    dp.include_router(router)
-    await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

@@ -359,7 +359,7 @@ class SystemActions:
         query = text.lower()
         for word in stop_words:
             query = query.replace(word, "")
-        query = query.strip()
+        query = re.sub(r'[^\w\s-]', '', query).strip()
 
         if not query:
             return None
@@ -890,7 +890,8 @@ class SystemActions:
                 city_raw = slots["city"].strip()
 
         if not city_raw and text:
-            text_clean = text.lower()
+            text_clean = re.sub(r'[^\w\s-]', '', text.lower())
+
             match = re.search(r'\b(?:в|во|на)\s+([а-яёa-z\s-]+)', text_clean)
             if match:
                 possible_city = match.group(1).strip()

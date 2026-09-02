@@ -1,10 +1,9 @@
 import os
-import sys
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from core.utils.config import get_user_data_path
+from core.utils.config import USER_DATA_DIR
 
 SCOPES = [
     'https://www.googleapis.com/auth/contacts.readonly',
@@ -14,14 +13,8 @@ SCOPES = [
 
 class GoogleContactsManager:
     def __init__(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        if getattr(sys, 'frozen', False):
-            app_dir = os.path.dirname(sys.executable)
-        else:
-            app_dir = base_dir
-
-        self.creds_path = os.path.join(app_dir, "personal_data", "configs", "google", "credentials.json")
-        self.token_path = get_user_data_path("google", "token.json")
+        self.creds_path = os.path.join(USER_DATA_DIR, "google", "credentials.json")
+        self.token_path = os.path.join(USER_DATA_DIR, "google", "token.json")
 
     def _get_credentials(self):
         creds = None
