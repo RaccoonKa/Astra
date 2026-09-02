@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import librosa
 import onnxruntime as ort
+from core.utils.config import get_resource_path
 
 EMOTION_LABELS = ["neutral", "happy", "sad", "angry", "other"]
 
@@ -14,15 +15,10 @@ EMOTION_TRANSLATION = {
     "other": "прочее"
 }
 
-
 class EmotionClassifier:
     def __init__(self, model_rel_path="optimized_models/emotion_crnn/model_crnn_quant.onnx"):
-        if getattr(sys, 'frozen', False):
-            base_dir = os.path.dirname(sys.executable)
-        else:
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-        model_path = os.path.join(base_dir, model_rel_path)
+        path_parts = model_rel_path.replace("\\", "/").split("/")
+        model_path = get_resource_path(*path_parts)
 
         if not os.path.exists(model_path):
             print(f"[EMOTION WARNING]: Файл модели не найден: {model_path}")

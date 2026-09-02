@@ -10,25 +10,31 @@ from mediapipe.tasks.python import vision
 
 
 def get_hand_model_path():
+    candidate_dirs = []
+
     if getattr(sys, 'frozen', False):
-        project_dir = os.path.dirname(sys.executable)
+        exe_dir = os.path.dirname(sys.executable)
+        candidate_dirs.append(exe_dir)
+        candidate_dirs.append(os.path.join(exe_dir, "_internal"))
+        if hasattr(sys, '_MEIPASS'):
+            candidate_dirs.append(sys._MEIPASS)
     else:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        project_dir = os.path.dirname(os.path.dirname(script_dir))
+        candidate_dirs.append(os.path.dirname(os.path.dirname(script_dir)))
 
-    candidate_paths = [
-        os.path.join(project_dir, "optimized_models", "hand_landmarker", "hand_landmarker.task"),
-        os.path.join(project_dir, "optimized_models", "hand_landmaker", "hand_landmarker.task"),
-        os.path.join(project_dir, "optimized_models", "hand_landmarker.task")
-    ]
+    candidate_paths = []
+    for d in candidate_dirs:
+        candidate_paths.append(os.path.join(d, "optimized_models", "hand_landmarker", "hand_landmarker.task"))
+        candidate_paths.append(os.path.join(d, "optimized_models", "hand_landmaker", "hand_landmarker.task"))
+        candidate_paths.append(os.path.join(d, "optimized_models", "hand_landmarker.task"))
 
     for p in candidate_paths:
         if os.path.exists(p) and os.path.getsize(p) >= 5000000:
             return p
 
-    models_dir = os.path.join(project_dir, "optimized_models", "hand_landmarker")
-    os.makedirs(models_dir, exist_ok=True)
-    model_path = os.path.join(models_dir, "hand_landmarker.task")
+    target_dir = os.path.join(candidate_dirs[0], "optimized_models", "hand_landmarker")
+    os.makedirs(target_dir, exist_ok=True)
+    model_path = os.path.join(target_dir, "hand_landmarker.task")
 
     url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
     try:

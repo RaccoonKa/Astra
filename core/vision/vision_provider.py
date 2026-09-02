@@ -90,8 +90,8 @@ class VisionThread(QThread):
                 try:
                     from core.vision.eye_detector import EyeDetector
                     self.eye_detector = EyeDetector()
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[EyeDetector Init Error]: {e}")
             elif not eye_enabled and self.eye_detector is not None:
                 if hasattr(self.eye_detector, 'detector'):
                     self.eye_detector.detector.close()
@@ -101,8 +101,8 @@ class VisionThread(QThread):
                 try:
                     from core.vision.gesture_detector import GestureDetector
                     self.gesture_detector = GestureDetector()
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[GestureDetector Init Error]: {e}")
             elif not gestures_enabled and self.gesture_detector is not None:
                 if hasattr(self.gesture_detector, 'detector'):
                     self.gesture_detector.detector.close()

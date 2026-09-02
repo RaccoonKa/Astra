@@ -1,4 +1,5 @@
 import asyncio
+import certifi
 import os
 import sys
 import time
@@ -21,22 +22,20 @@ from aiogram.types import FSInputFile, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.client.session.aiohttp import AiohttpSession
 from PyQt6.QtCore import QThread
 
+os.environ["SSL_CERT_FILE"] = certifi.where()
+os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-if getattr(sys, 'frozen', False):
-    APP_DIR = Path(sys.executable).parent
-else:
-    APP_DIR = ROOT_DIR
-
-from core.utils.config import load_config, save_config, get_user_data_path
+from core.utils.config import load_config, save_config, get_user_data_path, get_resource_path
 from core.nlp.command_parser import CommandParser
 from core.nlp.asr_corrector import ASRCorrector
 
 PAIRING_PATH = Path(get_user_data_path("pairing_session.json"))
-VOSK_MODEL_PATH = APP_DIR / "optimized_models" / "model_vosk"
-SILERO_PATH = APP_DIR / "optimized_models" / "silero_tts" / "v4_ru.pt"
+VOSK_MODEL_PATH = Path(get_resource_path("optimized_models", "model_vosk"))
+SILERO_PATH = Path(get_resource_path("optimized_models", "silero_tts", "v4_ru.pt"))
 
 router = Router()
 current_bot_instance = None
@@ -44,6 +43,7 @@ command_parser_instance = None
 corrector_instance = None
 vosk_model_instance = None
 silero_model_instance = None
+main_window_instance = None  # Глобальная ссылка на интерфейс Астры
 
 ERROR_UNREACHABLE_MSG = (
     "Я потеряла контакт с твоим ноутом 🥺\n"
@@ -389,17 +389,29 @@ async def handle_cam(message: types.Message):
     if message.from_user.id != get_admin_id():
         await message.answer("Доступ запрещен. Открой настройки на ПК и отсканируй QR-код.")
         return
+
     path = os.path.join(tempfile.gettempdir(), f"temp_cam_{int(time.time())}.png")
     try:
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        ret, frame = cap.read()
-        cap.release()
-        if ret and frame is not None:
+        global main_window_instance
+        frame = None
+
+        if main_window_instance and getattr(main_window_instance, 'vision_thread', None):
+            if main_window_instance.vision_thread.isRunning():
+                frame = main_window_instance.vision_thread.current_frame
+
+        if frame is None:
+            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            ret, frame_read = cap.read()
+            cap.release()
+            if ret and frame_read is not None:
+                frame = frame_read
+
+        if frame is not None:
             cv2.imwrite(path, frame)
             photo = FSInputFile(path)
-            await message.answer_photo(photo, caption="Снимок с камеры")
+            await message.answer_photo(photo, caption="Снимок с веб-камеры 📷")
         else:
-            await message.answer("Ой, не могу включить камеру... Возможно, её уже заняло другое приложение 📷")
+            await message.answer("Ой, не могу получить снимок... Возможно, камера занята другим приложением 📷")
     except Exception as e:
         print(f"[Telegram Camera Error]: {e}")
         await message.answer(ERROR_UNREACHABLE_MSG)
@@ -566,6 +578,8 @@ async def handle_text_chat(message: types.Message):
 class TelegramBotThread(QThread):
     def __init__(self, parent=None):
         super().__init__(parent)
+        global main_window_instance
+        main_window_instance = parent
         self.loop = None
         self.bot = None
         self._running = True
@@ -605,6 +619,9 @@ class TelegramBotThread(QThread):
 
         try:
             self.loop.run_until_complete(_run_polling())
+        except RuntimeError as e:
+            if "Event loop stopped before Future completed" not in str(e):
+                print(f"[TELEGRAM BOT THREAD ERROR]: {e}")
         except Exception as e:
             print(f"[TELEGRAM BOT THREAD ERROR]: {e}")
         finally:

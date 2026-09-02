@@ -1067,7 +1067,7 @@ class MainWindow(QWidget):
             return
 
         self.vision_thread = VisionThread(camera_index=0, parent=self)
-        self.presence_manager = PresenceManager(timeout_seconds=60, parent=self)
+        self.presence_manager = PresenceManager(timeout_seconds=600, parent=self)
 
         self.vision_thread.face_detected_signal.connect(self.presence_manager.process_face_status)
         self.vision_thread.gesture_detected_signal.connect(self.on_gesture_detected)

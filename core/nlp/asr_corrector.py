@@ -17,7 +17,7 @@ from core.utils.config import get_resource_path
 
 
 class ASRCorrector:
-    def __init__(self, model_dir: str = None):
+    def init(self, model_dir: str = None):
         if model_dir is None:
             model_dir = get_resource_path("optimized_models", "corrector")
 
@@ -25,7 +25,10 @@ class ASRCorrector:
         self.model = ORTModelForSeq2SeqLM.from_pretrained(
             model_dir,
             local_files_only=True,
-            use_io_binding=False
+            use_io_binding=False,
+            encoder_file_name="encoder_model.onnx",
+            decoder_file_name="decoder_model.onnx",
+            decoder_with_past_file_name="decoder_with_past_model.onnx"
         )
 
     def correct(self, text: str) -> str:

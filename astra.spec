@@ -14,10 +14,11 @@ datas = []
 binaries = []
 hiddenimports = []
 
-vosk_datas, vosk_binaries, vosk_hidden = collect_all('vosk')
-datas += vosk_datas
-binaries += vosk_binaries
-hiddenimports += vosk_hidden
+for pkg in ['vosk', 'mediapipe', 'face_recognition', 'face_recognition_models', 'dlib']:
+    pkg_datas, pkg_binaries, pkg_hidden = collect_all(pkg)
+    datas += pkg_datas
+    binaries += pkg_binaries
+    hiddenimports += pkg_hidden
 
 vpn_templates = os.path.join(base_dir, 'services', 'vpn', 'templates')
 if os.path.exists(vpn_templates):
@@ -29,27 +30,18 @@ if os.path.exists(os.path.join(base_dir, 'assets')):
 if os.path.exists(os.path.join(base_dir, 'optimized_models')):
     datas.append((os.path.join(base_dir, 'optimized_models'), 'optimized_models'))
 
-template_path = os.path.join(base_dir, 'personal_data', 'configs', 'config.template.json')
-if os.path.exists(template_path):
-    datas.append((template_path, os.path.join('personal_data', 'configs')))
-
-google_creds_path = os.path.join(base_dir, 'personal_data', 'configs', 'google', 'credentials.json')
-if os.path.exists(google_creds_path):
-    datas.append((google_creds_path, os.path.join('personal_data', 'configs', 'google')))
+personal_data_path = os.path.join(base_dir, 'personal_data')
+if os.path.exists(personal_data_path):
+    datas.append((personal_data_path, 'personal_data'))
 
 datas += collect_data_files('transformers')
 datas += collect_data_files('torch')
 datas += collect_data_files('certifi')
-try:
-    datas += collect_data_files('face_recognition_models')
-except Exception:
-    pass
+datas += collect_data_files('matplotlib')
 
 hiddenimports += [
     'pkg_resources',
     'setuptools',
-    'face_recognition',
-    'face_recognition_models',
     'scipy.signal',
     'sounddevice',
     'soundfile',
@@ -64,9 +56,6 @@ hiddenimports += [
     'requests',
     'qrcode',
     'packaging',
-    'packaging.version',
-    'packaging.specifiers',
-    'packaging.requirements',
     'googleapiclient',
     'google_auth_oauthlib',
     'google.oauth2.credentials',
@@ -74,7 +63,7 @@ hiddenimports += [
     'pyautogui',
     'psutil',
     'PIL',
-    'mediapipe'
+    'matplotlib'
 ]
 
 hiddenimports += collect_submodules('core')
@@ -91,7 +80,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'notebook', 'IPython'],
+    excludes=['tkinter', 'notebook', 'IPython'], # Убрали matplotlib из исключений
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -110,7 +99,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -2,18 +2,15 @@ import inspect
 
 _orig_findsource = inspect.findsource
 
-
 def _safe_findsource(obj):
     try:
         return _orig_findsource(obj)
     except Exception:
         return (["\n"], 0)
 
-
 inspect.findsource = _safe_findsource
 
 _orig_getsource = inspect.getsource
-
 
 def _safe_getsource(obj):
     try:
@@ -21,19 +18,24 @@ def _safe_getsource(obj):
     except Exception:
         return "\n"
 
-
 inspect.getsource = _safe_getsource
 
 import os
 import sys
 import ctypes
+import certifi
+
+# Глушим безобидное предупреждение PyQt6 о DPI на Windows
+os.environ["QT_LOGGING_RULES"] = "qt.qpa.window=false"
+os.environ["SSL_CERT_FILE"] = certifi.where()
+os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from core.utils.config import load_config
 from gui.chat_window import MainWindow
 from gui.tray import SystemTray
 from gui.onboarding_wizard import OnboardingWizard
-
 
 def get_ico_path():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -44,7 +46,6 @@ def get_ico_path():
     if os.path.exists(fallback_ico):
         return os.path.abspath(fallback_ico)
     return ""
-
 
 def apply_native_windows_icon(hwnd, icon_path):
     if not icon_path or not os.path.exists(icon_path):
@@ -79,9 +80,8 @@ def apply_native_windows_icon(hwnd, icon_path):
         except AttributeError:
             ctypes.windll.user32.SetClassLongW(hwnd, gclp_hiconsm, h_icon_small)
 
-
 def main():
-    myappid = 'svetozar.astra.voiceassistant.1.2.0'
+    myappid = 'svetozar.astra.voiceassistant.2.3.1'
     try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     except Exception:
@@ -124,7 +124,6 @@ def main():
     tray.show()
 
     sys.exit(app.exec())
-
 
 if __name__ == "__main__":
     main()

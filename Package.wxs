@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Astra Voice Assistant"
            Manufacturer="Svetozar Kravchuk"
-           Version="2.0.0"
+           Version="2.3.1"
            UpgradeCode="4F82C9E4-1B18-4E4D-B5F2-81D6C7892301">
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of Astra is already installed on your PC." />

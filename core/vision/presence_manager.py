@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 import time
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
-from core.utils.config import get_user_data_path
 
 
 class PresenceManager(QObject):
@@ -34,11 +33,14 @@ class PresenceManager(QObject):
         self.timer.stop()
 
     def load_owner_faces(self):
-        owner_folder = os.path.normpath(get_user_data_path("..", "owner_face"))
+        appdata_dir = os.environ.get("APPDATA", os.path.expanduser("~"))
+        owner_folder = os.path.join(appdata_dir, "Astra", "owner_face")
+
         cache_file = os.path.join(owner_folder, "encodings_cache.npy")
         self.owner_encodings = []
 
         if not os.path.exists(owner_folder):
+            print(f"[PresenceManager]: Папка owner_face не найдена по пути: {owner_folder}")
             return
 
         valid_exts = (".jpg", ".jpeg", ".png")
@@ -49,6 +51,7 @@ class PresenceManager(QObject):
         ]
 
         if not image_files:
+            print(f"[PresenceManager]: В папке {owner_folder} нет фотографий!")
             return
 
         if os.path.exists(cache_file):
@@ -64,6 +67,7 @@ class PresenceManager(QObject):
 
         try:
             import face_recognition
+            import cv2
             for file_path in image_files:
                 try:
                     img = face_recognition.load_image_file(file_path)
@@ -80,8 +84,9 @@ class PresenceManager(QObject):
 
             if self.owner_encodings:
                 np.save(cache_file, np.array(self.owner_encodings))
-        except Exception:
-            pass
+                print(f"[PresenceManager]: Успешно загружено {len(self.owner_encodings)} лиц владельца!")
+        except Exception as e:
+            print(f"[PresenceManager]: Ошибка загрузки лиц: {e}")
 
     def verify_faces(self, frame_rgb):
         try:

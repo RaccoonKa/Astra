@@ -12,9 +12,8 @@ else:
     APP_DIR = ROOT_DIR
     USER_DATA_DIR = os.path.join(ROOT_DIR, "personal_data")
 
-CONFIG_DIR = os.path.join(USER_DATA_DIR, "configs") if getattr(sys, 'frozen', False) else os.path.join(ROOT_DIR, "personal_data", "configs")
+CONFIG_DIR = os.path.join(USER_DATA_DIR, "configs")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
-TEMPLATE_FILE = os.path.join(APP_DIR, "personal_data", "configs", "config.template.json")
 
 DEFAULT_CONFIG = {
     "user_name": "друг",
@@ -60,20 +59,24 @@ DEFAULT_CONFIG = {
 
 def get_resource_path(*subpaths) -> str:
     if getattr(sys, 'frozen', False):
-        base_internal = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-        cand_internal = os.path.join(base_internal, *subpaths)
-        if os.path.exists(cand_internal):
-            return cand_internal
-        cand_root = os.path.join(os.path.dirname(sys.executable), *subpaths)
-        if os.path.exists(cand_root):
-            return cand_root
-        return cand_internal
+        exe_dir = os.path.dirname(sys.executable)
+        candidates = [
+            os.path.join(exe_dir, "_internal", *subpaths),
+            os.path.join(exe_dir, *subpaths),
+        ]
+        if hasattr(sys, '_MEIPASS'):
+            candidates.insert(0, os.path.join(sys._MEIPASS, *subpaths))
+
+        for cand in candidates:
+            if os.path.exists(cand):
+                return cand
+        return candidates[0]
     else:
         return os.path.join(ROOT_DIR, *subpaths)
 
 
 def get_user_data_path(*subpaths) -> str:
-    path = os.path.join(CONFIG_DIR, *subpaths)
+    path = os.path.join(USER_DATA_DIR, *subpaths)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     return path
 
@@ -99,9 +102,10 @@ def load_config() -> dict:
         except Exception:
             pass
 
-    if os.path.exists(TEMPLATE_FILE):
+    template_file = get_resource_path("personal_data", "configs", "config.template.json")
+    if os.path.exists(template_file):
         try:
-            with open(TEMPLATE_FILE, "r", encoding="utf-8") as f:
+            with open(template_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 final_cfg = _deep_merge(DEFAULT_CONFIG, data)
                 save_config(final_cfg)
