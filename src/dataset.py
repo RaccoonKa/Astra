@@ -100,22 +100,42 @@ class VoiceprintDataset(Dataset):
         return mel, speaker_id
 
 
-def build_manifests(data_raw_dir="data/raw", manifest_dir="data/manifest", pairs_count=200):
+def build_manifests(base_raw_dir="data/raw", manifest_dir="data/manifest", pairs_count=200):
     os.makedirs(manifest_dir, exist_ok=True)
 
     speakers = {}
-    speaker_id_map = {}
-    current_id = 0
+    speaker_names = {}
 
-    for root, _, files in os.walk(data_raw_dir):
-        wav_files = [os.path.join(root, f) for f in files if f.lower().endswith(".wav")]
-        if not wav_files:
-            continue
-        speaker_name = os.path.basename(root)
-        if speaker_name not in speaker_id_map:
-            speaker_id_map[speaker_name] = current_id
-            speakers[current_id] = wav_files
-            current_id += 1
+    dev_dir = os.path.join(base_raw_dir, "developer", "model_data")
+    dev_files = []
+    if os.path.exists(dev_dir):
+        for root, _, files in os.walk(dev_dir):
+            for f in files:
+                if f.lower().endswith(".wav"):
+                    dev_files.append(os.path.join(root, f))
+
+    if dev_files:
+        speakers[0] = dev_files
+        speaker_names[0] = "developer"
+
+    dist_dir = os.path.join(base_raw_dir, "distractors", "model_data")
+    current_id = 1
+    if os.path.exists(dist_dir):
+        for folder_name in sorted(os.listdir(dist_dir)):
+            sub_path = os.path.join(dist_dir, folder_name)
+            if os.path.isdir(sub_path):
+                spk_files = [
+                    os.path.join(sub_path, f)
+                    for f in os.listdir(sub_path)
+                    if f.lower().endswith(".wav")
+                ]
+                if spk_files:
+                    speakers[current_id] = spk_files
+                    speaker_names[current_id] = folder_name
+                    current_id += 1
+
+    if len(speakers) < 2:
+        raise ValueError("Найдено меньше двух дикторов. Проверь наличие .wav файлов в папках model_data!")
 
     train_rows = []
     for spk_id, paths in speakers.items():
@@ -130,19 +150,20 @@ def build_manifests(data_raw_dir="data/raw", manifest_dir="data/manifest", pairs
 
     pairs = []
     spk_ids = list(speakers.keys())
+    eligible_positive_spks = [s for s in spk_ids if len(speakers[s]) >= 2]
 
-    for _ in range(pairs_count // 2):
-        spk = random.choice(spk_ids)
-        if len(speakers[spk]) >= 2:
-            w1, w2 = random.sample(speakers[spk], 2)
-            pairs.append({"path1": w1, "path2": w2, "label": 1})
+    half_pairs = pairs_count // 2
 
-    for _ in range(pairs_count // 2):
-        if len(spk_ids) >= 2:
-            spk1, spk2 = random.sample(spk_ids, 2)
-            w1 = random.choice(speakers[spk1])
-            w2 = random.choice(speakers[spk2])
-            pairs.append({"path1": w1, "path2": w2, "label": 0})
+    for _ in range(half_pairs):
+        spk = random.choice(eligible_positive_spks)
+        w1, w2 = random.sample(speakers[spk], 2)
+        pairs.append({"path1": w1, "path2": w2, "label": 1})
+
+    for _ in range(half_pairs):
+        spk1, spk2 = random.sample(spk_ids, 2)
+        w1 = random.choice(speakers[spk1])
+        w2 = random.choice(speakers[spk2])
+        pairs.append({"path1": w1, "path2": w2, "label": 0})
 
     random.shuffle(pairs)
     val_csv = os.path.join(manifest_dir, "val_pairs.csv")
@@ -151,14 +172,16 @@ def build_manifests(data_raw_dir="data/raw", manifest_dir="data/manifest", pairs
         writer.writeheader()
         writer.writerows(pairs)
 
-    print(f"Манифест train.csv создан: {len(train_rows)} сэмплов, {len(speakers)} дикторов.")
-    print(f"Манифест val_pairs.csv создан: {len(pairs)} тестовых пар.")
+    print(f"Успешно сгенерирован train.csv: {len(train_rows)} сэмплов от {len(speakers)} дикторов.")
+    for spk_id, name in speaker_names.items():
+        print(f"  * ID {spk_id:02d} ({name}): {len(speakers[spk_id])} файлов")
+    print(f"Успешно сгенерирован val_pairs.csv: {len(pairs)} проверочных пар (50% совпадений, 50% чужаков).")
 
 
 if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     build_manifests(
-        data_raw_dir=os.path.join(base_dir, "data", "raw"),
+        base_raw_dir=os.path.join(base_dir, "data", "raw"),
         manifest_dir=os.path.join(base_dir, "data", "manifest"),
-        pairs_count=100
+        pairs_count=160
     )
