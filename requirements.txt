@@ -1,0 +1,12 @@
+torch
+transformers
+datasets
+accelerate
+scikit-learn
+onnx
+onnxruntime
+onnxscript
+pandas
+matplotlib
+seaborn
+wordcloud
