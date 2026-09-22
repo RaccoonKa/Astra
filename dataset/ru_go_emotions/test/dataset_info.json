@@ -1,0 +1,88 @@
+{
+  "builder_name": "parquet",
+  "citation": "",
+  "config_name": "simplified",
+  "dataset_name": "ru_go_emotions",
+  "dataset_size": 12643036,
+  "description": "",
+  "download_size": 7628917,
+  "features": {
+    "ru_text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "labels": {
+      "feature": {
+        "names": [
+          "admiration",
+          "amusement",
+          "anger",
+          "annoyance",
+          "approval",
+          "caring",
+          "confusion",
+          "curiosity",
+          "desire",
+          "disappointment",
+          "disapproval",
+          "disgust",
+          "embarrassment",
+          "excitement",
+          "fear",
+          "gratitude",
+          "grief",
+          "joy",
+          "love",
+          "nervousness",
+          "optimism",
+          "pride",
+          "realization",
+          "relief",
+          "remorse",
+          "sadness",
+          "surprise",
+          "neutral"
+        ],
+        "_type": "ClassLabel"
+      },
+      "_type": "List"
+    },
+    "id": {
+      "dtype": "string",
+      "_type": "Value"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 20271953,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 10124532,
+      "num_examples": 43410,
+      "dataset_name": "ru_go_emotions"
+    },
+    "validation": {
+      "name": "validation",
+      "num_bytes": 1262722,
+      "num_examples": 5426,
+      "dataset_name": "ru_go_emotions"
+    },
+    "test": {
+      "name": "test",
+      "num_bytes": 1255782,
+      "num_examples": 5427,
+      "dataset_name": "ru_go_emotions"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}

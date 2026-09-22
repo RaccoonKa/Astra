@@ -1,0 +1,46 @@
+{
+  "add_cross_attention": false,
+  "architectures": [
+    "BertForSequenceClassification"
+  ],
+  "attention_probs_dropout_prob": 0.1,
+  "bos_token_id": null,
+  "classifier_dropout": null,
+  "dtype": "float32",
+  "emb_size": 312,
+  "eos_token_id": null,
+  "gradient_checkpointing": false,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.1,
+  "hidden_size": 312,
+  "id2label": {
+    "0": "joy_praise",
+    "1": "negative_sarcasm",
+    "2": "sadness_fatigue",
+    "3": "surprise",
+    "4": "neutral"
+  },
+  "initializer_range": 0.02,
+  "intermediate_size": 600,
+  "is_decoder": false,
+  "label2id": {
+    "joy_praise": 0,
+    "negative_sarcasm": 1,
+    "neutral": 4,
+    "sadness_fatigue": 2,
+    "surprise": 3
+  },
+  "layer_norm_eps": 1e-12,
+  "max_position_embeddings": 2048,
+  "model_type": "bert",
+  "num_attention_heads": 12,
+  "num_hidden_layers": 3,
+  "pad_token_id": 0,
+  "position_embedding_type": "absolute",
+  "problem_type": "multi_label_classification",
+  "tie_word_embeddings": true,
+  "transformers_version": "5.17.0",
+  "type_vocab_size": 2,
+  "use_cache": false,
+  "vocab_size": 83828
+}
