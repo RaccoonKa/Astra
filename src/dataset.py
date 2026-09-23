@@ -81,14 +81,23 @@ class VoiceprintDataset(Dataset):
         wav_path, speaker_id = self.samples[idx]
         waveform, sr = torchaudio.load(wav_path)
 
+        if waveform.shape[0] > 1:
+            waveform = torch.mean(waveform, dim=0, keepdim=True)
+
+        if sr != 16000:
+            resampler = T.Resample(sr, 16000)
+            waveform = resampler(waveform)
+            sr = 16000
+
         if self.augment and self.augmentor:
             waveform = self.augmentor.apply_waveform_noise(waveform)
 
-        if waveform.shape[-1] < self.segment_length:
-            pad_amount = self.segment_length - waveform.shape[-1]
-            waveform = torch.nn.functional.pad(waveform, (0, pad_amount), mode="reflect")
-        elif waveform.shape[-1] > self.segment_length:
-            max_start = waveform.shape[-1] - self.segment_length
+        current_len = waveform.shape[-1]
+        if current_len < self.segment_length:
+            repeat_factor = (self.segment_length // current_len) + 1
+            waveform = waveform.repeat(1, repeat_factor)[:, :self.segment_length]
+        elif current_len > self.segment_length:
+            max_start = current_len - self.segment_length
             start = random.randint(0, max_start) if self.augment else 0
             waveform = waveform[:, start:start + self.segment_length]
 
@@ -103,39 +112,26 @@ class VoiceprintDataset(Dataset):
 def build_manifests(base_raw_dir="data/raw", manifest_dir="data/manifest", pairs_count=200):
     os.makedirs(manifest_dir, exist_ok=True)
 
+    model_data_dir = os.path.join(base_raw_dir, "speakers", "model_data")
+    if not os.path.exists(model_data_dir):
+        raise FileNotFoundError(f"Папка не найдена: {model_data_dir}")
+
     speakers = {}
     speaker_names = {}
+    current_id = 0
 
-    dev_dir = os.path.join(base_raw_dir, "developer", "model_data")
-    dev_files = []
-    if os.path.exists(dev_dir):
-        for root, _, files in os.walk(dev_dir):
-            for f in files:
-                if f.lower().endswith(".wav"):
-                    dev_files.append(os.path.join(root, f))
-
-    if dev_files:
-        speakers[0] = dev_files
-        speaker_names[0] = "developer"
-
-    dist_dir = os.path.join(base_raw_dir, "distractors", "model_data")
-    current_id = 1
-    if os.path.exists(dist_dir):
-        for folder_name in sorted(os.listdir(dist_dir)):
-            sub_path = os.path.join(dist_dir, folder_name)
-            if os.path.isdir(sub_path):
-                spk_files = [
-                    os.path.join(sub_path, f)
-                    for f in os.listdir(sub_path)
-                    if f.lower().endswith(".wav")
-                ]
-                if spk_files:
-                    speakers[current_id] = spk_files
-                    speaker_names[current_id] = folder_name
-                    current_id += 1
-
-    if len(speakers) < 2:
-        raise ValueError("Найдено меньше двух дикторов. Проверь наличие .wav файлов в папках model_data!")
+    for folder_name in sorted(os.listdir(model_data_dir)):
+        sub_path = os.path.join(model_data_dir, folder_name)
+        if os.path.isdir(sub_path):
+            spk_files = [
+                os.path.join(sub_path, f)
+                for f in os.listdir(sub_path)
+                if f.lower().endswith(".wav")
+            ]
+            if len(spk_files) >= 2:
+                speakers[current_id] = spk_files
+                speaker_names[current_id] = folder_name
+                current_id += 1
 
     train_rows = []
     for spk_id, paths in speakers.items():
@@ -150,12 +146,10 @@ def build_manifests(base_raw_dir="data/raw", manifest_dir="data/manifest", pairs
 
     pairs = []
     spk_ids = list(speakers.keys())
-    eligible_positive_spks = [s for s in spk_ids if len(speakers[s]) >= 2]
-
     half_pairs = pairs_count // 2
 
     for _ in range(half_pairs):
-        spk = random.choice(eligible_positive_spks)
+        spk = random.choice(spk_ids)
         w1, w2 = random.sample(speakers[spk], 2)
         pairs.append({"path1": w1, "path2": w2, "label": 1})
 
@@ -172,10 +166,8 @@ def build_manifests(base_raw_dir="data/raw", manifest_dir="data/manifest", pairs
         writer.writeheader()
         writer.writerows(pairs)
 
-    print(f"Успешно сгенерирован train.csv: {len(train_rows)} сэмплов от {len(speakers)} дикторов.")
-    for spk_id, name in speaker_names.items():
-        print(f"  * ID {spk_id:02d} ({name}): {len(speakers[spk_id])} файлов")
-    print(f"Успешно сгенерирован val_pairs.csv: {len(pairs)} проверочных пар (50% совпадений, 50% чужаков).")
+    print(f"Собрано {len(train_rows)} записей от {len(speakers)} дикторов.")
+    print(f"Сгенерировано {len(pairs)} пар для валидации.")
 
 
 if __name__ == "__main__":
@@ -183,5 +175,5 @@ if __name__ == "__main__":
     build_manifests(
         base_raw_dir=os.path.join(base_dir, "data", "raw"),
         manifest_dir=os.path.join(base_dir, "data", "manifest"),
-        pairs_count=160
+        pairs_count=200
     )
