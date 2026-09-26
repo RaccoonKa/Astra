@@ -47,6 +47,8 @@ class YandexMusicManager:
         self.watcher_thread = None
         self.stop_watcher = False
         self.is_transitioning = False
+        self.normal_volume = 100
+        self.is_ducked = False
 
     def _extract_pure_token(self, raw_token):
         if not raw_token:
@@ -178,16 +180,34 @@ class YandexMusicManager:
         return f"Ищу {query}"
 
     def set_volume(self, volume: int):
+        val = max(0, min(100, volume))
+        self.normal_volume = val
         if HAS_VLC and self.player:
-            self.player.audio_set_volume(max(0, min(100, volume)))
+            self.player.audio_set_volume(val)
 
-    def duck(self, level: int = 15):
-        if HAS_VLC and self.player and self.player.is_playing():
-            self.player.audio_set_volume(level)
+    def duck(self, factor: float = 0.2):
+        if not HAS_VLC or not self.player or not self.player.is_playing():
+            return
+        if not self.is_ducked:
+            current = self.player.audio_get_volume()
+            if current > 0:
+                self.normal_volume = current
+            self.is_ducked = True
+            target = max(1, int(self.normal_volume * factor))
+            self.player.audio_set_volume(target)
+        else:
+            target = max(1, int(self.normal_volume * factor))
+            if target < self.player.audio_get_volume():
+                self.player.audio_set_volume(target)
 
-    def unduck(self, level: int = 100):
-        if HAS_VLC and self.player and self.player.is_playing():
-            self.player.audio_set_volume(level)
+    def unduck(self, level: int = None):
+        if not HAS_VLC or not self.player:
+            self.is_ducked = False
+            return
+        if self.is_ducked:
+            restore_vol = self.normal_volume if level is None else level
+            self.player.audio_set_volume(restore_vol)
+            self.is_ducked = False
 
     def play_my_wave(self):
         if not HAS_VLC:

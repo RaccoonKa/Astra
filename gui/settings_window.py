@@ -6,28 +6,82 @@ import winreg
 import shutil
 from PyQt6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QScrollArea, QWidget, QComboBox, QDialog, QTextEdit, QFileDialog, QSlider, QProgressBar
+    QPushButton, QScrollArea, QWidget, QComboBox, QDialog, QFileDialog, QSlider, QProgressBar
 )
 from PyQt6.QtCore import (
     Qt, QTimer, QRectF, QPoint, QPointF, pyqtSignal,
-    QVariantAnimation, QEasingCurve
+    QVariantAnimation, QEasingCurve, QUrl
 )
 from PyQt6.QtGui import (
     QPainter, QPen, QColor, QLinearGradient, QBrush, QPainterPath,
-    QFont, QFontDatabase
+    QFont, QFontDatabase, QGuiApplication
 )
+from PyQt6.QtMultimedia import QSoundEffect
 from core.utils.config import load_config, save_config, get_user_data_path, get_resource_path, USER_DATA_DIR
 from core.utils.updater import CURRENT_VERSION, DownloaderThread, apply_update_and_restart
+from gui.voice_enrollment_dialog import VoiceEnrollmentDialog
+from core.nlp.speaker_verifier import SpeakerVerifier
+
+
+def convert_audio_to_wav(src_path: str, dst_path: str) -> bool:
+    if src_path.lower().endswith(".wav"):
+        try:
+            shutil.copy(src_path, dst_path)
+            return True
+        except Exception:
+            return False
+
+    try:
+        import soundfile as sf
+        data, sr = sf.read(src_path)
+        sf.write(dst_path, data, sr, format='WAV')
+        return True
+    except Exception:
+        pass
+
+    try:
+        from pydub import AudioSegment
+        sound = AudioSegment.from_file(src_path)
+        sound.export(dst_path, format="wav")
+        return True
+    except Exception:
+        pass
+
+    try:
+        import torchaudio
+        waveform, sr = torchaudio.load(src_path)
+        torchaudio.save(dst_path, waveform, sr)
+        return True
+    except Exception:
+        pass
+
+    try:
+        import subprocess
+        res = subprocess.run(
+            ["ffmpeg", "-y", "-i", src_path, dst_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        if res.returncode == 0 and os.path.exists(dst_path):
+            return True
+    except Exception:
+        pass
+
+    return False
+
 
 SPEECH_HINTS = {
-    "autostart": "Включив автозапуск, я буду просыпаться одновременно с твоим компьютером! Тебе даже не придется искать мою иконку — я сразу буду тут, готова помогать.",
+    "autostart": "Включив автозапуск, я буду просыпаться одновременно с твоим компьютером. Тебе даже не придётся искать мою иконку — я сразу буду тут, готова помогать.",
+    "framerate": "Выбирай частоту кадров, сбалансированный режим на шестьдесят кадров подходит для слабого компьютера, а ультра-режим на сто двадцать кадров делает частицы и анимации идеально мягкими.",
     "voice_volume": "Ползунок регулирует громкость моей речи относительно системного звука!",
+    "alarm_sound": "Здесь ты можешь выбрать одну из трёх моих мелодий для будильника или загрузить свой собственный трек с компьютера. Кнопкой рядом можно сразу послушать, как он звучит!",
     "user_gender": "Выбери свой пол, чтобы я правильно обращалась к тебе и никогда не путала окончания слов!",
-    "vpn_service": "Выбери, какую виртуальную сеть ты используешь! Я смогу автоматически запускать и переключать её по голосовой команде.",
-    "telegram_pair": "Включив эту функцию, я смогу дистанционно управлять твоим компьютером или просто общаться с тобой прямо в телеграме! Смогу управлять твоей камерой, питанием, статусом компьютера.",
-    "face_recognition": "Если включишь эту функцию, я буду узнавать тебя в лицо! Смогу радостно здороваться при твоем возвращении и защищать систему от чужих глаз.",
-    "eye_tracking": "С этой функцией я смогу следить за твоими глазками. Если замечу, что часто моргаешь или долго сидишь с закрытыми глазами — я заботливо предложу отдохнуть!",
-    "gestures": "С жестами я смогу понимать тебя без слов! Покажешь кулак — заблокирую твой компьютер, чтобы никто не получил к нему доступ кроме тебя. Покажешь ладонь — поставлю музыку на паузу. Почти магия!",
+    "vpn_service": "Выбери, какую виртуальную сеть ты используешь. Я смогу автоматически запускать и переключать её по голосовой команде.",
+    "telegram_pair": "Включив эту функцию, я смогу дистанционно управлять твоим компьютером или просто общаться с тобой прямо в телеграме. Смогу управлять твоей камерой, питанием, статусом компьютера.",
+    "voice_id": "Здесь ты можешь записать слепок своего голоса, чтобы я откликалась только на тебя и не реагировала на чужие голоса, стримы или телевизор. А после верификации создателя сюда можно добавить и профили друзей!",
+    "face_recognition": "Если включишь эту функцию, я буду узнавать тебя в лицо. Смогу радостно здороваться при твоем возвращении и защищать систему от чужих глаз.",
+    "eye_tracking": "С этой функцией, я смогу следить за твоими глазками. Если замечу, что часто моргаешь или долго сидишь с закрытыми глазами — я заботливо предложу отдохнуть!",
+    "gestures": "С жестами я смогу понимать тебя без слов. Покажешь кулак — заблокирую твой компьютер, чтобы никто не получил к нему доступ кроме тебя. Покажешь ладонь — поставлю музыку на паузу. Почти магия!",
     "music_service": "Выбери, где мне включать музыку! Если переключатель включен — я буду ставить треки и запускать твою волну рекомендаций в Спотике, а если выключен — в +Яндексе.",
     "gigachat": "Это мой главный ум и вдохновение! Вставив ключ Гигачата, ты дашь мне возможность болтать с тобой обо всём на свете, шутить и отвечать на любые вопросы.",
     "yandex": "Доверь мне свой плейлист! Я смогу запускать твою волну, включать треки под настроение и ставить лайки.",
@@ -101,13 +155,18 @@ API_GUIDES = {
 
 
 class ApiGuideDialog(QDialog):
-    def __init__(self, title, text, font_family, parent=None):
+    def __init__(self, title, text, font_family, parent=None, width=480, height=400):
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(450, 360)
+        self.setFixedSize(width, height)
         self.font_family = font_family
         self.drag_position = QPoint()
+
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        x = screen.x() + (screen.width() - width) // 2
+        y = screen.y() + (screen.height() - height) // 2
+        self.move(x, y)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 14, 16, 14)
@@ -131,19 +190,46 @@ class ApiGuideDialog(QDialog):
 
         layout.addLayout(header_row)
 
-        self.text_view = QTextEdit()
-        self.text_view.setObjectName("GuideContent")
-        self.text_view.setFont(QFont(self.font_family, 14))
-        self.text_view.setReadOnly(True)
-        self.text_view.setPlainText(text)
-        layout.addWidget(self.text_view)
+        guide_card = QFrame()
+        guide_card.setStyleSheet("""
+            QFrame {
+                background-color: rgba(14, 12, 7, 0.70);
+                border: 1px solid rgba(196, 160, 40, 0.25);
+                border-radius: 8px;
+            }
+        """)
+        card_layout = QVBoxLayout(guide_card)
+        card_layout.setContentsMargins(4, 4, 4, 4)
+
+        self.scroll = SmoothScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll.setStyleSheet("background: transparent; border: none;")
+
+        scroll_widget = QWidget()
+        scroll_widget.setStyleSheet("background: transparent;")
+        scroll_layout = QVBoxLayout(scroll_widget)
+        scroll_layout.setContentsMargins(8, 8, 10, 8)
+        scroll_layout.setSpacing(0)
+
+        self.content_lbl = QLabel(text)
+        self.content_lbl.setFont(QFont(self.font_family, 12))
+        self.content_lbl.setWordWrap(True)
+        self.content_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.content_lbl.setStyleSheet("color: #fffde7; background: transparent; border: none;")
+        scroll_layout.addWidget(self.content_lbl)
+
+        self.scroll.setWidget(scroll_widget)
+        card_layout.addWidget(self.scroll)
+
+        layout.addWidget(guide_card, 1)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
         ok_btn = QPushButton("Понятно")
         ok_btn.setObjectName("GuideCloseBtn")
-        ok_btn.setFont(QFont(self.font_family, 14, QFont.Weight.Bold))
+        ok_btn.setFont(QFont(self.font_family, 12, QFont.Weight.Bold))
         ok_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         ok_btn.clicked.connect(self.accept)
         btn_row.addWidget(ok_btn)
@@ -227,33 +313,50 @@ class NoScrollComboBox(QComboBox):
 class SmoothScrollArea(QScrollArea):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._target_pos = None
-        self._current_pos = None
+        self._current_pos = 0.0
+        self._velocity = 0.0
+        self._friction = 0.935
         self._timer = QTimer(self)
-        self._timer.setInterval(16)
+        self._timer.setInterval(14)
         self._timer.timeout.connect(self._on_smooth_step)
 
+        v_bar = self.verticalScrollBar()
+        v_bar.sliderPressed.connect(self._on_slider_pressed)
+
+    def _on_slider_pressed(self):
+        self._timer.stop()
+        self._velocity = 0.0
+        self._target_pos = None
+        self._current_pos = float(self.verticalScrollBar().value())
+
     def wheelEvent(self, event):
-        p_delta = event.pixelDelta().y()
-        a_delta = event.angleDelta().y()
-
-        if p_delta != 0:
-            delta = p_delta * 1.5
-        elif a_delta != 0:
-            delta = a_delta * 0.8
-        else:
-            super().wheelEvent(event)
-            return
-
         v_bar = self.verticalScrollBar()
         min_val = float(v_bar.minimum())
         max_val = float(v_bar.maximum())
 
-        if self._target_pos is None:
-            self._target_pos = float(v_bar.value())
-            self._current_pos = float(v_bar.value())
+        if min_val >= max_val:
+            super().wheelEvent(event)
+            return
 
-        self._target_pos = max(min_val, min(self._target_pos - delta, max_val))
+        if not self._timer.isActive():
+            self._current_pos = float(v_bar.value())
+            self._velocity = 0.0
+
+        p_delta = event.pixelDelta().y()
+        a_delta = event.angleDelta().y()
+
+        if p_delta != 0:
+            impulse = -p_delta * 0.45
+        elif a_delta != 0:
+            impulse = -(a_delta / 120.0) * 7.5
+        else:
+            super().wheelEvent(event)
+            return
+
+        self._velocity += impulse
+        self._velocity = max(-35.0, min(35.0, self._velocity))
 
         if not self._timer.isActive():
             self._timer.start()
@@ -261,21 +364,25 @@ class SmoothScrollArea(QScrollArea):
         event.accept()
 
     def _on_smooth_step(self):
-        if self._target_pos is None:
-            self._timer.stop()
-            return
-
         v_bar = self.verticalScrollBar()
-        diff = self._target_pos - self._current_pos
+        min_val = float(v_bar.minimum())
+        max_val = float(v_bar.maximum())
 
-        if abs(diff) < 0.5:
-            self._current_pos = self._target_pos
-            v_bar.setValue(int(round(self._current_pos)))
-            self._target_pos = None
+        self._current_pos += self._velocity
+        self._velocity *= self._friction
+
+        if self._current_pos <= min_val:
+            self._current_pos = min_val
+            self._velocity = 0.0
+        elif self._current_pos >= max_val:
+            self._current_pos = max_val
+            self._velocity = 0.0
+
+        v_bar.setValue(int(round(self._current_pos)))
+
+        if abs(self._velocity) < 0.2:
+            self._velocity = 0.0
             self._timer.stop()
-        else:
-            self._current_pos += diff * 0.20
-            v_bar.setValue(int(round(self._current_pos)))
 
 
 class ModernToggle(QWidget):
@@ -346,14 +453,24 @@ class ModernToggle(QWidget):
 class SettingsFrame(QFrame):
     speak_requested = pyqtSignal(str)
     vision_state_changed = pyqtSignal(bool)
+    fps_changed = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.border_phase = 0.0
+        self.border_opacity = 0.0
+        self.border_anim = QVariantAnimation(self)
+        self.border_anim.setDuration(350)
+        self.border_anim.setEasingCurve(QEasingCurve.Type.InOutSine)
+        self.border_anim.valueChanged.connect(self._on_border_anim_step)
+        self.speaker_verifier = SpeakerVerifier(threshold=0.70)
         self.saved_vision_state = False
         self.update_download_url = None
         self.downloader_thread = None
+        self.preview_sound = QSoundEffect(self)
+        self.preview_sound.playingChanged.connect(self._on_preview_playing_changed)
+        self.custom_alarm_path = ""
 
         font_path = get_resource_path("assets", "fonts", "Schiffbauer-Regular.otf")
         font_id = QFontDatabase.addApplicationFont(font_path)
@@ -373,6 +490,9 @@ class SettingsFrame(QFrame):
 
         self.init_ui()
         self.load_settings()
+
+    def mousePressEvent(self, event):
+        event.accept()
 
     def _create_hint_button(self, hint_key):
         btn = QPushButton("?")
@@ -397,10 +517,49 @@ class SettingsFrame(QFrame):
             dialog = ApiGuideDialog(guide["title"], guide["text"], self.font_family, self)
             dialog.exec()
 
+    def _show_astra_capabilities(self):
+        title = "✨ Возможности и команды Астры"
+        text = (
+            "Добро пожаловать в руководство Астры!\n\n"
+            "Мои возможности:\n\n"
+            "1. Управление системой:\n"
+            "— Блокировка экрана, сон, выключение и перезагрузка ПК.\n"
+            "— Открыть любое приложение на твоём устройстве.\n"
+            "— Режимы 'Работа' и 'Отдых' (запуск твоих избранных программ и сайтов).\n\n"
+            "2. Музыка, медиа и прочее:\n"
+            "— Включение треков, Моей волны в Яндекс Музыке и Spotify.\n"
+            "— Пауза, переключение треков, лайки и дизлайки.\n"
+            "— Прогноз погоды в любой точке мира.\n"
+            "— Поиск роликов на YouTube и фильмов на HDRezka.\n\n"
+            "3. Умный дом и сеть:\n"
+            "— Управление светом, розетками и сценариями Дома с Алисой.\n"
+            "— Управление zapret и VPN.\n\n"
+            "4. Компьютерное зрение:\n"
+            "— Распознавание лица владельца через веб-камеру.\n"
+            "— Управление жестами рук и контроль усталости глаз.\n\n"
+            "5. Чат и общение:\n"
+            "— Живой диалог с распознаванием эмоций и голоса.\n"
+            "— Память на самые яркие моменты в общении.\n"
+            "— Голосовая биометрия.\n"
+            "— Распознавание шёпота пользователя и диалог шёпотом.\n"
+            "— Скажи 'давай играть' и играй с Астрой в одну из трёх игр.\n"
+            "— Визуальная реакция на каждую эмоцию пользователя.\n\n"
+            "6. TG-Bot:\n"
+            "— Удалённое управление компьютером (выключение, перезапуск и т.д.).\n"
+            "— Возможность скачки файлов с устройства на телефон.\n"
+            "— Защита устройства от посторонних.\n"
+        )
+        dialog = ApiGuideDialog(title, text, self.font_family, self, width=520, height=430)
+        dialog.exec()
+
     def _open_telegram_pairing(self):
         try:
             from gui.telegram_pair_dialog import TelegramPairDialog
             dialog = TelegramPairDialog(self.font_family, self)
+            screen = QGuiApplication.primaryScreen().availableGeometry()
+            x = screen.x() + (screen.width() - dialog.width()) // 2
+            y = screen.y() + (screen.height() - dialog.height()) // 2
+            dialog.move(x, y)
             if dialog.exec():
                 self.load_settings()
         except Exception as e:
@@ -487,19 +646,40 @@ class SettingsFrame(QFrame):
         main_layout.setContentsMargins(14, 14, 14, 14)
         main_layout.setSpacing(10)
 
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+
         title = QLabel("Настройки Астры")
         title.setObjectName("SettingsMainTitle")
         title.setFont(QFont(self.font_family, 15, QFont.Weight.Bold))
-        main_layout.addWidget(title)
+        header_layout.addWidget(title)
+
+        header_layout.addStretch()
+
+        author_label = QLabel("Created by Svetozar")
+        author_label.setObjectName("AuthorLabel")
+        author_label.setFont(QFont(self.font_family, 10))
+        header_layout.addWidget(author_label, 0, Qt.AlignmentFlag.AlignBottom)
+
+        main_layout.addLayout(header_layout)
 
         self.scroll = SmoothScrollArea()
         self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll.setObjectName("SettingsScroll")
 
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(0, 0, 6, 0)
         scroll_layout.setSpacing(10)
+
+        self.btn_capabilities = QPushButton("✨ Возможности и команды Астры")
+        self.btn_capabilities.setObjectName("GuideCloseBtn")
+        self.btn_capabilities.setFixedHeight(34)
+        self.btn_capabilities.setFont(QFont(self.font_family, 11, QFont.Weight.Bold))
+        self.btn_capabilities.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_capabilities.clicked.connect(self._show_astra_capabilities)
+        scroll_layout.addWidget(self.btn_capabilities)
 
         card_sys = QFrame()
         card_sys.setObjectName("SettingsCard")
@@ -514,6 +694,13 @@ class SettingsFrame(QFrame):
 
         row_auto, self.autostart_toggle = self._create_toggle_row("Автозапуск при включении", "autostart")
         layout_sys.addLayout(row_auto)
+
+        fps_items = [
+            ("Баланс (60 FPS)", 60),
+            ("Плавность (120 FPS)", 120)
+        ]
+        row_fps, self.fps_combo = self._create_combo_row("Частота кадров:", fps_items, "framerate")
+        layout_sys.addLayout(row_fps)
 
         row_vol = QHBoxLayout()
         row_vol.setContentsMargins(4, 2, 4, 2)
@@ -537,6 +724,54 @@ class SettingsFrame(QFrame):
         row_vol.addWidget(self.voice_slider)
 
         layout_sys.addLayout(row_vol)
+
+        row_alarm_sound = QHBoxLayout()
+        row_alarm_sound.setContentsMargins(4, 2, 4, 2)
+        row_alarm_sound.setSpacing(6)
+
+        lbl_alarm_title = QLabel("Будильник:")
+        lbl_alarm_title.setObjectName("ToggleLabel")
+        lbl_alarm_title.setFont(QFont(self.font_family, 11))
+        row_alarm_sound.addWidget(lbl_alarm_title)
+        row_alarm_sound.addStretch()
+
+        hint_alarm_btn = self._create_hint_button("alarm_sound")
+        row_alarm_sound.addWidget(hint_alarm_btn)
+
+        self.btn_preview_alarm = QPushButton("▶")
+        self.btn_preview_alarm.setObjectName("AttachBtn")
+        self.btn_preview_alarm.setFixedSize(26, 26)
+        self.btn_preview_alarm.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_preview_alarm.setStyleSheet(
+            "QPushButton#AttachBtn { color: #ffd700; font-size: 13px; } QPushButton#AttachBtn:hover { color: #ffffff; }")
+        self.btn_preview_alarm.clicked.connect(self._toggle_preview_alarm)
+        row_alarm_sound.addWidget(self.btn_preview_alarm)
+
+        self.btn_choose_custom_alarm = QPushButton("📁")
+        self.btn_choose_custom_alarm.setObjectName("AttachBtn")
+        self.btn_choose_custom_alarm.setFixedSize(26, 26)
+        self.btn_choose_custom_alarm.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_choose_custom_alarm.clicked.connect(self._choose_custom_alarm_file)
+        self.btn_choose_custom_alarm.hide()
+        row_alarm_sound.addWidget(self.btn_choose_custom_alarm)
+
+        alarm_items = [
+            ("Мелодия 1", "alarm_1"),
+            ("Мелодия 2", "alarm_2"),
+            ("Мелодия 3", "alarm_3"),
+            ("Свой файл", "custom")
+        ]
+        self.alarm_sound_combo = NoScrollComboBox()
+        self.alarm_sound_combo.setObjectName("SettingCombo")
+        self.alarm_sound_combo.setFont(QFont(self.font_family, 10))
+        self.alarm_sound_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.alarm_sound_combo.setFixedWidth(110)
+        for name, key in alarm_items:
+            self.alarm_sound_combo.addItem(name, key)
+        self.alarm_sound_combo.currentIndexChanged.connect(self._on_alarm_combo_changed)
+        row_alarm_sound.addWidget(self.alarm_sound_combo)
+
+        layout_sys.addLayout(row_alarm_sound)
 
         gender_items = [
             ("Мужской", "male"),
@@ -581,6 +816,50 @@ class SettingsFrame(QFrame):
         layout_sys.addLayout(row_tg_pair)
 
         scroll_layout.addWidget(card_sys)
+
+        card_voiceprint = QFrame()
+        card_voiceprint.setObjectName("SettingsCard")
+        layout_vp = QVBoxLayout(card_voiceprint)
+        layout_vp.setContentsMargins(10, 8, 10, 10)
+        layout_vp.setSpacing(8)
+
+        head_vp = QHBoxLayout()
+        head_vp.setContentsMargins(0, 0, 0, 0)
+
+        lbl_vp = QLabel("Голосовая биометрия (Voice ID)")
+        lbl_vp.setObjectName("CardHeader")
+        lbl_vp.setFont(QFont(self.font_family, 11, QFont.Weight.Bold))
+        head_vp.addWidget(lbl_vp)
+        head_vp.addStretch()
+
+        hint_vp_btn = self._create_hint_button("voice_id")
+        head_vp.addWidget(hint_vp_btn)
+
+        layout_vp.addLayout(head_vp)
+
+        self.lbl_vp_status = QLabel("Голос владельца: не записан")
+        self.lbl_vp_status.setObjectName("ToggleLabel")
+        self.lbl_vp_status.setFont(QFont(self.font_family, 11))
+        self.lbl_vp_status.setWordWrap(True)
+        layout_vp.addWidget(self.lbl_vp_status)
+
+        self.btn_enroll_owner = QPushButton("🎙 Записать мой голос")
+        self.btn_enroll_owner.setObjectName("GuideCloseBtn")
+        self.btn_enroll_owner.setFont(QFont(self.font_family, 10, QFont.Weight.Bold))
+        self.btn_enroll_owner.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_enroll_owner.setFixedHeight(30)
+        self.btn_enroll_owner.clicked.connect(self._open_enroll_owner)
+        layout_vp.addWidget(self.btn_enroll_owner)
+
+        self.btn_add_friend = QPushButton("➕ Добавить пользователя")
+        self.btn_add_friend.setObjectName("AttachBtn")
+        self.btn_add_friend.setFont(QFont(self.font_family, 10))
+        self.btn_add_friend.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_add_friend.setFixedHeight(30)
+        self.btn_add_friend.clicked.connect(self._open_enroll_friend)
+        layout_vp.addWidget(self.btn_add_friend)
+
+        scroll_layout.addWidget(card_voiceprint)
 
         card_modes = QFrame()
         card_modes.setObjectName("SettingsCard")
@@ -882,6 +1161,76 @@ class SettingsFrame(QFrame):
         except Exception as e:
             print(f"[Autostart Reg Error]: {e}")
 
+    def _on_preview_playing_changed(self):
+        if self.preview_sound.isPlaying():
+            self.btn_preview_alarm.setText("■")
+        else:
+            self.btn_preview_alarm.setText("▶")
+
+    def _on_alarm_combo_changed(self, index):
+        mode = self.alarm_sound_combo.currentData()
+        if mode == "custom":
+            self.btn_choose_custom_alarm.show()
+        else:
+            self.btn_choose_custom_alarm.hide()
+
+        if self.preview_sound.isPlaying():
+            self.preview_sound.stop()
+
+    def _choose_custom_alarm_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выбери свой звук будильника",
+            "",
+            "Аудио файлы (*.wav *.mp3 *.ogg *.flac *.m4a);;WAV (*.wav);;MP3 (*.mp3);;Все файлы (*.*)"
+        )
+        if file_path:
+            self.status_label.setText("Обработка аудиофайла...")
+            self.status_label.setStyleSheet("color: #ffd700; font-size: 11px;")
+            QGuiApplication.processEvents()
+
+            target_wav = get_user_data_path("custom_alarm.wav")
+            ok = convert_audio_to_wav(file_path, target_wav)
+
+            if ok and os.path.exists(target_wav):
+                self.custom_alarm_path = target_wav
+                idx_custom = self.alarm_sound_combo.findData("custom")
+                if idx_custom != -1:
+                    self.alarm_sound_combo.setCurrentIndex(idx_custom)
+                self.status_label.setText("✓ Звук будильника успешно установлен!")
+                self.status_label.setStyleSheet("color: #ffd700; font-size: 11px; font-weight: bold;")
+            else:
+                self.status_label.setText("✕ Ошибка конвертации аудио в WAV")
+                self.status_label.setStyleSheet("color: #ff5252; font-size: 11px; font-weight: bold;")
+
+            QTimer.singleShot(2500, lambda: self.status_label.setText(""))
+
+    def _toggle_preview_alarm(self):
+        if self.preview_sound.isPlaying():
+            self.preview_sound.stop()
+            return
+
+        mode = self.alarm_sound_combo.currentData()
+        path = None
+
+        if mode == "custom":
+            if self.custom_alarm_path and os.path.exists(self.custom_alarm_path):
+                path = self.custom_alarm_path
+        else:
+            path = get_resource_path("assets", "sounds", f"{mode}.wav")
+
+        if path and os.path.exists(path):
+            self.preview_sound.stop()
+            self.preview_sound.setSource(QUrl.fromLocalFile(path))
+            self.preview_sound.setLoopCount(1)
+            vol = self.voice_slider.value() / 100.0
+            self.preview_sound.setVolume(max(0.1, vol))
+            self.preview_sound.play()
+        else:
+            self.status_label.setText("Файл звука не найден!")
+            self.status_label.setStyleSheet("color: #ff5252; font-size: 11px;")
+            QTimer.singleShot(2000, lambda: self.status_label.setText(""))
+
     def load_settings(self):
         cfg = load_config()
         api_keys = cfg.get("api_keys", {})
@@ -889,9 +1238,23 @@ class SettingsFrame(QFrame):
 
         self.autostart_toggle.setChecked(cfg.get("autostart", False))
 
+        self._refresh_voiceprint_ui()
+
         vol_val = int(cfg.get("voice_volume", 100))
         self.voice_slider.setValue(vol_val)
         self.lbl_vol_title.setText(f"Громкость речи: {vol_val}%")
+
+        alarm_sound_val = cfg.get("alarm_sound", "alarm_1")
+        idx_alarm = self.alarm_sound_combo.findData(alarm_sound_val)
+        if idx_alarm != -1:
+            self.alarm_sound_combo.setCurrentIndex(idx_alarm)
+        self.custom_alarm_path = cfg.get("custom_alarm_path", "")
+        self.btn_choose_custom_alarm.setVisible(alarm_sound_val == "custom")
+
+        fps_val = int(cfg.get("target_fps", 60))
+        idx_fps = self.fps_combo.findData(fps_val)
+        if idx_fps != -1:
+            self.fps_combo.setCurrentIndex(idx_fps)
 
         gender_val = cfg.get("user_gender", "male").lower()
         idx_g = self.gender_combo.findData(gender_val)
@@ -959,7 +1322,14 @@ class SettingsFrame(QFrame):
         config_data["autostart"] = autostart_val
         self._apply_windows_autostart(autostart_val)
 
+        fps_val = self.fps_combo.currentData()
+        config_data["target_fps"] = fps_val
+
+        self.fps_changed.emit(fps_val)
+
         config_data["voice_volume"] = self.voice_slider.value()
+        config_data["alarm_sound"] = self.alarm_sound_combo.currentData()
+        config_data["custom_alarm_path"] = self.custom_alarm_path
         config_data["user_gender"] = self.gender_combo.currentData()
         config_data["vpn_service"] = self.vpn_combo.currentData()
 
@@ -1030,9 +1400,57 @@ class SettingsFrame(QFrame):
             self.status_label.setStyleSheet("color: #ff5252; font-size: 11px; font-weight: bold;")
             print(f"[Settings Save Error]: {e}")
 
-    def animate_border(self):
-        self.border_phase += 0.010
+    def _on_border_anim_step(self, val):
+        self.border_opacity = float(val)
         self.update()
+
+    def fade_in_border(self, duration=350):
+        self.border_anim.stop()
+        self.border_anim.setDuration(duration)
+        self.border_anim.setStartValue(self.border_opacity)
+        self.border_anim.setEndValue(1.0)
+        self.border_anim.start()
+
+    def fade_out_border(self, duration=150):
+        self.border_anim.stop()
+        self.border_anim.setDuration(duration)
+        self.border_anim.setStartValue(self.border_opacity)
+        self.border_anim.setEndValue(0.0)
+        self.border_anim.start()
+
+    def reset_border(self):
+        self.border_anim.stop()
+        self.border_opacity = 0.0
+        self.update()
+
+    def animate_border(self):
+        if self.border_opacity > 0.001:
+            self.border_phase += 0.010
+            self.update()
+
+    def _refresh_voiceprint_ui(self):
+        if self.speaker_verifier.is_enrolled():
+            owner_name = self.speaker_verifier.get_owner_name()
+            users = self.speaker_verifier.get_users_list()
+            friends = [u["name"] for u in users if not u["is_owner"]]
+            friends_str = f" | Друзья: {', '.join(friends)}" if friends else ""
+            self.lbl_vp_status.setText(f"Владелец: {owner_name}{friends_str}")
+            self.btn_enroll_owner.setText("🎙 Перезаписать мой голос")
+            self.btn_add_friend.setEnabled(True)
+        else:
+            self.lbl_vp_status.setText("Голос владельца: не записан (доступ открыт для всех)")
+            self.btn_enroll_owner.setText("🎙 Записать мой голос")
+            self.btn_add_friend.setEnabled(False)
+
+    def _open_enroll_owner(self):
+        dialog = VoiceEnrollmentDialog(self.speaker_verifier, is_owner=True, font_family=self.font_family, parent=self)
+        dialog.enrollment_completed.connect(self._refresh_voiceprint_ui)
+        dialog.exec()
+
+    def _open_enroll_friend(self):
+        dialog = VoiceEnrollmentDialog(self.speaker_verifier, is_owner=False, font_family=self.font_family, parent=self)
+        dialog.enrollment_completed.connect(self._refresh_voiceprint_ui)
+        dialog.exec()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -1048,18 +1466,20 @@ class SettingsFrame(QFrame):
 
         painter.fillPath(path, QColor(8, 8, 5, 240))
 
-        cx, cy = w / 2, h / 2
-        dx = math.cos(self.border_phase) * w
-        dy = math.sin(self.border_phase) * h
+        if self.border_opacity > 0.001:
+            cx, cy = w / 2, h / 2
+            dx = math.cos(self.border_phase) * w
+            dy = math.sin(self.border_phase) * h
 
-        border_grad = QLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy)
-        border_grad.setColorAt(0.0, QColor("#181406"))
-        border_grad.setColorAt(0.35, QColor("#3a3010"))
-        border_grad.setColorAt(0.5, QColor("#5c4e1a"))
-        border_grad.setColorAt(0.65, QColor("#3a3010"))
-        border_grad.setColorAt(1.0, QColor("#181406"))
+            border_grad = QLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy)
+            border_grad.setColorAt(0.0, QColor("#181406"))
+            border_grad.setColorAt(0.35, QColor("#3a3010"))
+            border_grad.setColorAt(0.5, QColor("#5c4e1a"))
+            border_grad.setColorAt(0.65, QColor("#3a3010"))
+            border_grad.setColorAt(1.0, QColor("#181406"))
 
-        pen_border = QPen(QBrush(border_grad), 1.5)
-        painter.setPen(pen_border)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawPath(path)
+            painter.setOpacity(self.border_opacity)
+            pen_border = QPen(QBrush(border_grad), 1.5)
+            painter.setPen(pen_border)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPath(path)

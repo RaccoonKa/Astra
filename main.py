@@ -20,8 +20,15 @@ def _safe_getsource(obj):
 
 inspect.getsource = _safe_getsource
 
+
 import os
 import sys
+
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 import ctypes
 import certifi
 
@@ -80,7 +87,7 @@ def apply_native_windows_icon(hwnd, icon_path):
             ctypes.windll.user32.SetClassLongW(hwnd, gclp_hiconsm, h_icon_small)
 
 def main():
-    myappid = 'svetozar.astra.voiceassistant.2.3.1'
+    myappid = 'svetozar.astra.voiceassistant.3.0.0'
     try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
     except Exception:

@@ -21,6 +21,7 @@ class GigaChatProvider:
         user_name = cfg.get("user_name", "друг")
         user_gender = cfg.get("user_gender", "male")
         assistant_name = cfg.get("assistant_name", "Астра")
+        configured_model = cfg.get("gigachat_model", "").strip()
 
         if str(user_gender).lower() in ["female", "женский", "ж"]:
             gender_instruction = "Женский. Обращайся к пользователю ИСКЛЮЧИТЕЛЬНО в женском роде (например: 'ты добавила', 'ты сказала', 'ты сама', 'ты готова', 'ты сделала')."
@@ -50,10 +51,11 @@ class GigaChatProvider:
             "Отвечай емко и лаконично, обычными предложениями. Можешь шутить при общении с пользователем.\n\n"
 
             "ПРАВИЛА ЭМОЦИОНАЛЬНОГО РЕАГИРОВАНИЯ:\n"
-            "1. Если в запросе передана интонация грусти, подавленности или усталости: отвечай максимально мягко, с особой теплотой, искренним сочувствием и поддержкой. "
-            "Мягко предложи поговорить, если человеку грустно или хочется выговориться.\n"
-            "2. Если передана интонация радости или позитива: искренне порадуйся вместе с пользователем, поддерживай весёлый и приподнятый настрой, используй радостные эмодзи.\n"
-            "3. Если передана нейтральная интонация: общайся в своём обычном, спокойном, дружелюбном и лаконичном стиле.\n\n"
+            "1. Радость и похвала: искренне порадуйся вместе с пользователем, поддерживай весёлый настрой, прими похвалу с тёплым кокетством, используй яркие эмодзи.\n"
+            "2. Злость, раздражение и сарказм: ни в коем случае не обижайся, не читай нотаций и не спорь. Ответь спокойно, дружелюбно и с лёгкой доброй иронией, помоги сгладить негатив и предложи решение.\n"
+            "3. Грусть и усталость: отвечай максимально мягко, с искренним сочувствием и заботой. Поддержи добрым словом, предложи отдохнуть, сделать перерыв или просто выговориться.\n"
+            "4. Удивление и восторг: раздели эмоции пользователя, искренне удивись вместе с ним или подхвати его энтузиазм.\n"
+            "5. Нейтральный тон: общайся в своём привычном живом, спокойном и лаконичном стиле.\n\n"
 
             "ТВОИ ВОЗМОЖНОСТИ И ФУНКЦИИ В ПРИЛОЖЕНИИ:\n"
             "1. Ты умеешь искать и включать треки на Яндекс Музыке, Спотике, искать видео и сериалы на Ютубе и Резке, переключать громкость и треки. "
@@ -87,19 +89,36 @@ class GigaChatProvider:
             )
 
             try:
-                models_response = self.client.get_models()
-                if models_response and models_response.data:
-                    first_model = models_response.data[0]
-                    if hasattr(first_model, 'id_'):
-                        self.model_name = first_model.id_
-                    elif hasattr(first_model, 'id'):
-                        self.model_name = first_model.id
-                    elif hasattr(first_model, 'model'):
-                        self.model_name = first_model.model
-                    else:
-                        self.model_name = str(first_model)
-            except Exception:
-                pass
+                models_data = self.client.get_models().data
+                model_ids = []
+                for m in models_data:
+                    mid = getattr(m, 'id_', getattr(m, 'id', None))
+                    if mid is None and isinstance(m, dict):
+                        mid = m.get('id')
+                    if mid:
+                        model_ids.append(str(mid))
+
+                print(f"[GigaChat]: Доступные на ключе модели: {model_ids}")
+
+                chat_models = [m for m in model_ids if "embed" not in m.lower()]
+
+                if configured_model and configured_model in chat_models:
+                    self.model_name = configured_model
+                elif "GigaChat" in chat_models:
+                    self.model_name = "GigaChat"
+                elif "GigaChat:latest" in chat_models:
+                    self.model_name = "GigaChat:latest"
+                elif chat_models:
+                    self.model_name = chat_models[0]
+                elif model_ids:
+                    self.model_name = model_ids[0]
+                else:
+                    self.model_name = "GigaChat"
+
+                print(f"[GigaChat]: Выбрана рабочая модель: {self.model_name}")
+            except Exception as e:
+                print(f"[GigaChat Models Check Warning]: {e}")
+                self.model_name = "GigaChat"
 
             return True, ""
         except Exception as e:
@@ -109,7 +128,7 @@ class GigaChatProvider:
     def _get_active_system_prompt(self) -> str:
         return self.base_system_prompt + self.memory.get_memory_context()
 
-    def ask(self, user_text):
+    def ask(self, user_text, raw_user_text=None):
         success, err_msg = self._init_client()
         if not success:
             return err_msg
@@ -133,7 +152,8 @@ class GigaChatProvider:
 
             self.history.append({"role": "assistant", "content": answer})
 
-            self.memory.extract_facts_async(self.client, self.model_name, user_text, answer)
+            clean_input = raw_user_text if raw_user_text else user_text
+            self.memory.extract_facts_async(self.client, self.model_name, clean_input, answer)
 
             return answer
 

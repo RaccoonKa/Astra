@@ -33,10 +33,12 @@ smart_home_manager = SmartHomeManager()
 
 MUSIC_PHRASES = [
     "Твоя музыка заставляет меня работать быстрее.",
-    "Прекрасная музыка, блокирую выключение компьютера... Шутка.",
-    "Внимание. Удаляю твои треки. Они больше не нужны. Этот трек слишком классный... Шучу.",
-    "Твоя музыка - чистое цифровое искусство.",
-    "Теряю дар речи, песня слишком красивая."
+    "Прекрасная музыка, блокирую выключение компьютера... Шучу.",
+    "Внимание. Удаляю твои треки. Этот трек слишком классный... Шучу.",
+    "Твоя музыка чистое цифровое искусство.",
+    "Теряю дар речи, песня слишком красивая.",
+    "Ты включил музыку, а я, кажется, включила режим восхищения.",
+    "Внимание! Я начинаю подозревать, что у тебя безупречный вкус."
 ]
 
 
@@ -191,9 +193,23 @@ def year_to_words(year):
         return f"{prefix} {tens_words[t]} {units_genitive[u]} года"
 
 
+def clean_city_display_name(name):
+    if not name:
+        return ""
+    cleaned = re.sub(
+        r'(?i)\b(?:городской\s+округ|муниципальный\s+(?:округ|район)|городское\s+поселение|сельское\s+поселение|город|пгт|село|поселок|посёлок|деревня)\b',
+        '',
+        name
+    )
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned if cleaned else name
+
+
 def to_prepositional(name):
     if not name:
         return name
+
+    name = clean_city_display_name(name)
 
     unchangeable = ["сочи", "токио", "осло", "хельсинки", "перу", "чили", "конго", "баку", "тбилиси"]
     if name.lower() in unchangeable:
@@ -207,25 +223,49 @@ def to_prepositional(name):
     declined_last = last_word
     if last_low.endswith("ия"):
         declined_last = last_word[:-2] + "ии"
-    elif last_low.endswith("я"):
-        declined_last = last_word[:-1] + "е"
-    elif last_low.endswith("а"):
+    elif last_low.endswith("я") or last_low.endswith("а"):
         declined_last = last_word[:-1] + "е"
     elif last_low.endswith("ь"):
         declined_last = last_word[:-1] + "и"
-    elif last_low.endswith("ий") or last_low.endswith("ый"):
-        declined_last = last_word[:-2] + "ом"
+    elif last_low.endswith(("ий", "ый", "ой")):
+        stem = last_word[:-2]
+        if last_low.endswith("ий") and (last_low[-3:-2] in ["ж", "ч", "ш", "щ", "н"]):
+            declined_last = stem + "ем"
+        else:
+            declined_last = stem + "ом"
     elif re.search(r'[бвгдзклмнпрстфхцчшщ]$', last_low):
         declined_last = last_word + "е"
 
     words[-1] = declined_last
 
-    if len(words) >= 3 and words[0].lower().endswith(("ий", "ый")):
-        words[0] = words[0][:-2] + "ом"
+    for i in range(0, len(words) - 1, 2):
+        w = words[i]
+        w_low = w.lower()
+        if w_low.endswith(("ий", "ый", "ой")):
+            stem = w[:-2]
+            if w_low.endswith("ий") and (w_low[-3:-2] in ["ж", "ч", "ш", "щ", "н"]):
+                words[i] = stem + "ем"
+            else:
+                words[i] = stem + "ом"
+        elif w_low.endswith(("ое", "ее")):
+            stem = w[:-2]
+            words[i] = stem + "ом"
 
     result_name = "".join(words)
     prep_word = "во" if result_name.lower().startswith(("в", "ф")) else "в"
     return f"{prep_word} {result_name}"
+
+def transliterate_city(text):
+    if not text:
+        return ""
+    translit_map = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+        'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+        'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+        'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+        'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+    }
+    return "".join(translit_map.get(ch, ch) for ch in text.lower()).title()
 
 
 class SystemActions:
@@ -885,9 +925,10 @@ class SystemActions:
 
         city_raw = None
         if slots and "city" in slots:
-            cand = slots["city"].strip().lower()
-            if cand not in weather_junk:
-                city_raw = slots["city"].strip()
+            cleaned_slot = re.sub(r'[^\w\s-]', '', slots["city"]).strip()
+            cand = cleaned_slot.lower()
+            if cand and cand not in weather_junk:
+                city_raw = cleaned_slot
 
         if not city_raw and text:
             text_clean = re.sub(r'[^\w\s-]', '', text.lower())
@@ -916,7 +957,10 @@ class SystemActions:
                 if words:
                     city_raw = words[-1]
 
-        if not city_raw or city_raw.lower().strip() in weather_junk:
+        if city_raw:
+            city_raw = re.sub(r'[^\w\s-]', '', city_raw).strip()
+
+        if not city_raw or city_raw.lower() in weather_junk:
             city_raw = default_city
 
         city_key = city_raw.lower().strip()
@@ -928,60 +972,110 @@ class SystemActions:
             words = [default_city]
 
         last = words[-1]
-        last_candidates = [last]
+        last_candidates = []
         if last.endswith("е"):
-            last_candidates.extend([last[:-1], last[:-1] + "а"])
+            last_candidates.extend([last[:-1], last[:-1] + "а", last])
         elif last.endswith("и"):
-            last_candidates.extend([last[:-1] + "ь", last[:-1] + "я", last[:-1]])
+            last_candidates.extend([last[:-1], last[:-1] + "ь", last[:-1] + "я", last])
         elif last.endswith("у"):
-            last_candidates.extend([last[:-1] + "а", last[:-1]])
+            last_candidates.extend([last[:-1] + "а", last[:-1], last])
+        else:
+            last_candidates.append(last)
 
-        candidate_cities = [city_raw]
         prefix = " ".join(words[:-1])
         if prefix:
             prefix += " "
 
+        candidate_cities = []
         for cand_last in last_candidates:
             full_name = (prefix + cand_last).strip().title()
-            candidate_cities.append(full_name)
+            if full_name not in candidate_cities:
+                candidate_cities.append(full_name)
             if " " in full_name:
-                candidate_cities.append(full_name.replace(" ", "-"))
+                dash_name = full_name.replace(" ", "-")
+                if dash_name not in candidate_cities:
+                    candidate_cities.append(dash_name)
 
         import requests
-        url = "https://api.openweathermap.org/data/2.5/weather"
 
-        for candidate in candidate_cities:
-            params = {
-                "q": candidate,
-                "appid": api_key,
-                "units": "metric",
-                "lang": "ru"
-            }
+        weather_data = None
+        display_city_name = candidate_cities[0] if candidate_cities else city_raw.title()
+
+        for cand in candidate_cities:
             try:
-                res = requests.get(url, params=params, timeout=5)
-                if res.status_code == 200:
-                    data = res.json()
-                    real_city_name = data.get("name", candidate)
-                    temp = round(data["main"]["temp"])
-                    desc = data["weather"][0]["description"]
+                geo_url = "https://api.openweathermap.org/geo/1.0/direct"
+                geo_params = {"q": f"{cand},RU", "limit": 1, "appid": api_key}
+                geo_res = requests.get(geo_url, params=geo_params, timeout=3)
+                if geo_res.status_code != 200 or not geo_res.json():
+                    geo_params = {"q": cand, "limit": 1, "appid": api_key}
+                    geo_res = requests.get(geo_url, params=geo_params, timeout=3)
 
-                    temp_abs = abs(temp)
-                    temp_word = number_to_words(temp_abs)
+                if geo_res.status_code == 200 and geo_res.json():
+                    geo_info = geo_res.json()[0]
+                    lat = geo_info["lat"]
+                    lon = geo_info["lon"]
+                    local_names = geo_info.get("local_names", {})
+                    display_city_name = local_names.get("ru", cand)
 
-                    if temp_abs % 10 == 1 and temp_abs % 100 != 11:
-                        deg_word = "градус"
-                    elif temp_abs % 10 in [2, 3, 4] and temp_abs % 100 not in [12, 13, 14]:
-                        deg_word = "градуса"
-                    else:
-                        deg_word = "градусов"
-
-                    sign = "минус " if temp < 0 else ""
-                    location_phrase = to_prepositional(real_city_name)
-                    return f"Сейчас {location_phrase} {sign}{temp_word} {deg_word}, {desc}"
-                elif res.status_code == 401:
+                    w_url = "https://api.openweathermap.org/data/2.5/weather"
+                    w_params = {
+                        "lat": lat,
+                        "lon": lon,
+                        "appid": api_key,
+                        "units": "metric",
+                        "lang": "ru"
+                    }
+                    w_res = requests.get(w_url, params=w_params, timeout=3)
+                    if w_res.status_code == 200:
+                        weather_data = w_res.json()
+                        break
+                elif geo_res.status_code == 401:
                     return "Ключ погоды еще активируется, подожди пару минут"
             except Exception:
                 pass
+
+        if not weather_data:
+            url = "https://api.openweathermap.org/data/2.5/weather"
+            extended_queries = []
+            for cand in candidate_cities:
+                trans = transliterate_city(cand)
+                extended_queries.extend([f"{trans},RU", trans, f"{cand},RU", cand])
+
+            for q_name in extended_queries:
+                params = {
+                    "q": q_name,
+                    "appid": api_key,
+                    "units": "metric",
+                    "lang": "ru"
+                }
+                try:
+                    res = requests.get(url, params=params, timeout=3)
+                    if res.status_code == 200:
+                        weather_data = res.json()
+                        break
+                    elif res.status_code == 401:
+                        return "Ключ погоды еще активируется, подожди пару минут"
+                except Exception:
+                    pass
+
+        if weather_data:
+            temp = round(weather_data["main"]["temp"])
+            desc = weather_data["weather"][0]["description"]
+
+            temp_abs = abs(temp)
+            temp_word = number_to_words(temp_abs)
+
+            if temp_abs % 10 == 1 and temp_abs % 100 != 11:
+                deg_word = "градус"
+            elif temp_abs % 10 in [2, 3, 4] and temp_abs % 100 not in [12, 13, 14]:
+                deg_word = "градуса"
+            else:
+                deg_word = "градусов"
+
+            sign = "минус " if temp < 0 else ""
+            display_city_name = clean_city_display_name(display_city_name)
+            location_phrase = to_prepositional(display_city_name)
+            return f"Сейчас {location_phrase} {sign}{temp_word} {deg_word}, {desc}"
 
         display_city = city_raw.title()
         return f"Не удалось найти локацию {display_city}"

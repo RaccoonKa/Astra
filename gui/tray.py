@@ -1,4 +1,5 @@
 import os
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QAction, QIcon, QPixmap
 
@@ -38,12 +39,13 @@ class SystemTray(QSystemTrayIcon):
         self.activated.connect(self.on_tray_activated)
 
     def show_window(self):
+        self.window.setWindowState(self.window.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
         self.window.showNormal()
         self.window.activateWindow()
 
     def on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            if self.window.isVisible():
+            if self.window.isVisible() and self.window.isActiveWindow() and not self.window.isMinimized():
                 self.window.hide()
             else:
                 self.show_window()

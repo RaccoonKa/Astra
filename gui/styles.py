@@ -24,7 +24,7 @@ QLineEdit#InputField {
     color: #fffde7;
     border: 1px solid #3a3010;
     border-radius: 8px;
-    padding: 8px;
+    padding: 2px 10px 6px 10px;
     font-size: 13px;
 }
 QPushButton#SendButton {
@@ -346,5 +346,11 @@ QPushButton#UpdateNotificationBadge:hover {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(70, 58, 24, 0.95), stop:1 rgba(110, 90, 36, 0.95));
     color: #ffffff;
     border: 1.2px solid #ffffff;
+}
+QLabel#AuthorLabel {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding-bottom: 2px;
 }
 """

@@ -63,25 +63,27 @@ class MemoryManager:
         ).start()
 
     def _extract_worker(self, client, model_name: str, user_text: str, assistant_reply: str):
-        if not client or len(user_text.strip()) < 5:
+        if not client or len(user_text.strip()) < 6:
             return
 
-        ignore_phrases = [
+        ignore_prefixes = (
             "включи", "выключи", "поставь", "пауза", "громкость",
-            "погода", "запусти", "открой", "найди", "сколько время"
-        ]
-        low_text = user_text.lower()
-        if any(low_text.startswith(p) for p in ignore_phrases) and "запомни" not in low_text:
+            "погода", "запусти", "открой", "найди", "сколько время", "покажи"
+        )
+        low_text = user_text.lower().strip()
+        if low_text.startswith(ignore_prefixes) and "запомни" not in low_text:
             return
 
         extraction_prompt = (
-            "Проанализируй диалог и выдели постоянные факты о пользователе (его имя, увлечения, проекты, предпочтения, привычки, важные детали жизни), если они явно прозвучали.\n"
-            "Если новой постоянной информации нет, ответь строго: НЕТ\n"
-            "Если есть факт, сформулируй его кратко в одно предложение от третьего лица (например: 'Пользователь пишет проект на Python', 'Любит слушать рок'). "
-            "Не придумывай ничего лишнего.\n\n"
-            f"Сообщение пользователя: {user_text}\n"
+            "Ты — аналитик диалога. Определи, сообщил ли пользователь в своей реплике какую-либо личную информацию о себе: "
+            "своё имя, профессию, стек технологий, увлечения, любимые вещи, привычки или факты о своей жизни.\n\n"
+            "ПРАВИЛА:\n"
+            "1. Если пользователь просто задал вопрос, пошутил или поддержал разговор ни о чём — напиши ровно одно слово: НИЧЕГО\n"
+            "2. Если есть реальный факт о пользователе — сформулируй его кратко от 3-го лица в одно предложение (например: 'Пользователь пишет код на Python', 'Любит чай без сахара').\n"
+            "3. Не пиши вступительных слов, только сам факт или НИЧЕГО.\n\n"
+            f"Реплика пользователя: {user_text}\n"
             f"Ответ ассистента: {assistant_reply}\n\n"
-            "Факт:"
+            "Результат:"
         )
 
         try:
@@ -92,9 +94,12 @@ class MemoryManager:
             response = client.chat(payload)
             result = response.choices[0].message.content.strip()
 
-            if result and "НЕТ" not in result.upper() and len(result) < 150:
-                clean_fact = result.replace("Факт:", "").strip()
-                if clean_fact:
-                    self.add_fact(clean_fact)
-        except Exception:
-            pass
+            negative_markers = ["НИЧЕГО", "НЕТ", "ФАКТОВ НЕТ", "НЕТ НОВОЙ", "НЕТ ФАКТОВ"]
+            clean_res = result.replace("Результат:", "").replace("Факт:", "").strip()
+
+            if clean_res and clean_res.upper() not in negative_markers and not clean_res.upper().startswith("НЕТ"):
+                if 5 <= len(clean_res) <= 140:
+                    print(f"[Memory]: Новый факт в копилку -> '{clean_res}'", flush=True)
+                    self.add_fact(clean_res)
+        except Exception as e:
+            print(f"[Memory Extract Error]: {e}", flush=True)

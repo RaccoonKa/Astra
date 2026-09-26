@@ -28,6 +28,12 @@ DEFAULT_CONFIG = {
     "vpn_service": "",
     "hdrezka_domain": "https://ru1.hdreskaz.top",
     "voice_volume": 100,
+    "alarm_sound": "alarm_1",
+    "custom_alarm_path": "",
+    "target_fps": 60,
+    "is_muted": False,
+    "is_mini_mode": False,
+    "is_whisper_mode": False,
     "work_apps": [
         "https://github.com"
     ],

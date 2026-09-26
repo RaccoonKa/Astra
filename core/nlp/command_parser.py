@@ -8,13 +8,21 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import re
 import threading
 import numpy as np
+from datetime import datetime, timedelta
 from transformers.utils import logging as tf_logging
 from core.system.actions import SystemActions, zapret_manager
 from services.vpn.vpn_manager import VpnManager
 from core.nlp.llm_provider import GigaChatProvider
 from core.nlp.nlu import JointNLU
-from core.nlp.emotion_classifier import EmotionClassifier, EMOTION_TRANSLATION
 from core.nlp.document_parser import DocumentParser
+from core.nlp.speaker_verifier import SpeakerVerifier
+from core.nlp.text_emotion_classifier import TextEmotionClassifier
+from core.system.app_launcher import AppLauncher
+from core.system.time_parser import TimeParser
+from core.system.reminder_manager import ReminderManager
+from core.games.city_game import CityGame
+from core.games.believe_game import BelieveGame
+from core.games.danetki_game import DanetkiGame
 
 tf_logging.set_verbosity_error()
 
@@ -68,11 +76,37 @@ class CommandParser:
     def __init__(self, confidence_threshold=0.60):
         self.threshold = confidence_threshold
         self.llm = GigaChatProvider()
-        self.emotion_classifier = EmotionClassifier()
+        self.text_emotion_classifier = TextEmotionClassifier()
+        self.speaker_verifier = SpeakerVerifier(threshold=0.70)
         self.doc_parser = DocumentParser()
         self.waiting_for_zapret = False
         self.waiting_for_vpn = False
         self.last_emotion = "neutral"
+        self.app_launcher = AppLauncher()
+        self.time_parser = TimeParser()
+        self.reminder_manager = ReminderManager()
+        self.city_game = CityGame(llm_provider=self.llm)
+        self.believe_game = BelieveGame()
+        self.danetki_game = DanetkiGame(llm_provider=self.llm)
+        self.waiting_for_game_choice = False
+        self.last_discussed_game = None
+
+        self.game_rules = {
+            "города": (
+                "Правила игры в Города просты: мы по очереди называем города, где каждый следующий город "
+                "должен начинаться на последнюю букву предыдущего. Буквы Ь, Ъ и Ы автоматически пропускаются, "
+                "а повторять уже названные города нельзя!"
+            ),
+            "верю": (
+                "В игре «Верю — не верю» я зачитываю удивительный или необычный факт, а ты отвечаешь только "
+                "«Верю» или «Не верю». За каждый угаданный факт начисляется очко, а в конце подведём итоги!"
+            ),
+            "данетки": (
+                "Данетки — это детективная игра-головоломка. Я рассказываю странную завязку истории, а ты "
+                "задаёшь мне любые вопросы, чтобы докопаться до истины. Отвечать я могу только «Да», «Нет» "
+                "или «Не имеет значения». Если захочешь сдаться — просто скажи «Сдаюсь»!"
+            )
+        }
 
         self.intent_aliases = {
             "play_music": "play_music",
@@ -110,7 +144,7 @@ class CommandParser:
             return False
         try:
             samples = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
-            if np.max(np.abs(samples)) < 180:
+            if np.max(np.abs(samples)) < 80:
                 return False
 
             zcr = np.mean(np.abs(np.diff(np.sign(samples)))) / 2.0
@@ -121,9 +155,15 @@ class CommandParser:
             high_energy = np.sum(fft_vals[(freqs >= 1400) & (freqs < 6000)] ** 2) + 1e-6
             ratio = high_energy / low_energy
 
-            return bool(ratio > 1.65 and zcr > 0.11)
+            return bool(ratio > 1.55 and zcr > 0.11)
         except Exception:
             return False
+
+    def get_emotion(self, text):
+        if text:
+            ui_emo, ru_desc, conf = self.text_emotion_classifier.predict(text)
+            return ui_emo, ru_desc, conf
+        return "neutral", "нейтрально", 1.0
 
     def _extract_zapret_number(self, text):
         text_clean = text.lower().strip()
@@ -466,9 +506,199 @@ class CommandParser:
         user_display = text.strip() if text else ""
         is_whisper = self._detect_whisper(audio_data) if is_voice else False
 
-        emotion, emo_conf = self.emotion_classifier.predict(audio_data)
+        speaker_name = "друг"
+        is_owner = True
+
+        if is_voice and audio_data is not None and not is_whisper:
+            if self.speaker_verifier.is_enrolled():
+                is_recognized, speaker_name, score, is_owner = self.speaker_verifier.verify(audio_data)
+                if not is_recognized:
+                    print(f"[VoiceID]: Чужой голос или звук из колонок (score={score:.2f}) -> игнорирую", flush=True)
+                    return ""
+
+        emotion, emo_desc, emo_conf = self.get_emotion(text)
         self.last_emotion = emotion
-        emo_desc = EMOTION_TRANSLATION.get(emotion, "нейтральный")
+
+        if self.reminder_manager.is_ringing:
+            stop_triggers = ["стоп", "хватит", "выключи", "заткнись", "отключи", "тихо", "молчи", "выруби"]
+            snooze_triggers = ["отложи", "еще пять минут", "ещё пять минут", "позже", "дай поспать", "перенеси"]
+
+            if any(w in text_low for w in stop_triggers):
+                is_timer = self.reminder_manager.active_task and self.reminder_manager.active_task.get("type") == "timer"
+                self.reminder_manager.stop_ringing()
+                ans = "Таймер отключен." if is_timer else "Будильник отключен. Доброе утро! ☀️"
+                voice_ans = "" if is_timer else "Будильник отключен. Доброе утро!"
+                return {
+                    "user_display": "Стоп",
+                    "chat": ans,
+                    "voice": voice_ans,
+                    "emotion": "happy",
+                    "is_whisper": is_whisper
+                }
+            elif any(w in text_low for w in snooze_triggers):
+                self.reminder_manager.snooze(minutes=5)
+                return {
+                    "user_display": "Отложи на 5 минут",
+                    "chat": "Отложила будильник на 5 минут. Отдыхай 😴",
+                    "voice": "Отложила будильник на пять минут.",
+                    "emotion": "neutral",
+                    "is_whisper": is_whisper
+                }
+
+        if self.city_game.is_active:
+            res = self.city_game.handle_turn(text)
+            res["user_display"] = user_display
+            res["is_whisper"] = is_whisper
+            return res
+
+        if self.believe_game.is_active:
+            res = self.believe_game.handle_turn(text)
+            res["user_display"] = user_display
+            res["is_whisper"] = is_whisper
+            return res
+
+        if self.danetki_game.is_active:
+            res = self.danetki_game.handle_turn(text)
+            res["user_display"] = user_display
+            res["is_whisper"] = is_whisper
+            return res
+
+        rules_match = re.search(
+            r'\b(?:правила|как играть|объясни правила|расскажи правила)\s*(?:в|игры|про|для)?\s*([а-яё\s\-]*)\b',
+            text_low
+        )
+        if rules_match and any(kw in text_low for kw in ["правил", "как играть"]):
+            target_game = rules_match.group(1).strip()
+            if any(w in target_game for w in ["город", "города"]):
+                self.last_discussed_game = "cities"
+                ans = f"{self.game_rules['города']} Начнём игру?"
+            elif any(w in target_game for w in ["верю", "факт", "не верю"]):
+                self.last_discussed_game = "believe"
+                ans = f"{self.game_rules['верю']} Начнём игру?"
+            elif any(w in target_game for w in ["данетк", "данетки", "детектив"]):
+                self.last_discussed_game = "danetki"
+                ans = f"{self.game_rules['данетки']} Начнём игру?"
+            else:
+                self.last_discussed_game = None
+                ans = (
+                    "У меня есть три классные игры: «Города», «Верю — не верю» и «Данетки». "
+                    "Скажи, правила какой игры тебе рассказать, или назови игру, чтобы сразу начать!"
+                )
+            self.waiting_for_game_choice = True
+            return {
+                "user_display": user_display,
+                "chat": ans,
+                "voice": ans,
+                "emotion": "happy",
+                "is_whisper": is_whisper,
+                "followup": True
+            }
+
+        if self.waiting_for_game_choice:
+            cancel_words = ["отмена", "не хочу", "не надо", "стоп", "хватит", "назад", "ни во что", "передумал", "передумала"]
+            if any(w in text_low for w in cancel_words):
+                self.waiting_for_game_choice = False
+                self.last_discussed_game = None
+                ans = "Как захочешь! Если надумаешь поиграть — только скажи."
+                return {"user_display": user_display, "chat": ans, "voice": ans, "emotion": "neutral", "is_whisper": is_whisper}
+
+            affirmative_words = ["давай", "да", "угу", "ага", "погнали", "начинай", "стартуем", "ок"]
+            if self.last_discussed_game and any(w in text_low for w in affirmative_words):
+                game_to_start = self.last_discussed_game
+                self.waiting_for_game_choice = False
+                self.last_discussed_game = None
+                if game_to_start == "cities":
+                    res = self.city_game.start_game()
+                elif game_to_start == "believe":
+                    res = self.believe_game.start_game()
+                else:
+                    res = self.danetki_game.start_game()
+                res["user_display"] = user_display
+                res["is_whisper"] = is_whisper
+                return res
+
+            if any(w in text_low for w in ["город", "города", "первую", "первая", "в города"]):
+                self.waiting_for_game_choice = False
+                self.last_discussed_game = None
+                res = self.city_game.start_game()
+                res["user_display"] = user_display
+                res["is_whisper"] = is_whisper
+                return res
+
+            if any(w in text_low for w in ["верю", "факты", "правда", "вторую", "вторая", "верю не верю"]):
+                self.waiting_for_game_choice = False
+                self.last_discussed_game = None
+                res = self.believe_game.start_game()
+                res["user_display"] = user_display
+                res["is_whisper"] = is_whisper
+                return res
+
+            if any(w in text_low for w in ["данетк", "данетки", "детектив", "третью", "третья", "в данетки"]):
+                self.waiting_for_game_choice = False
+                self.last_discussed_game = None
+                res = self.danetki_game.start_game()
+                res["user_display"] = user_display
+                res["is_whisper"] = is_whisper
+                return res
+
+            ans = "Назови игру: «Города», «Верю — не верю» или «Данетки» (или спроси правила любой из них)."
+            return {"user_display": user_display, "chat": ans, "voice": ans, "emotion": "neutral", "is_whisper": is_whisper, "followup": True}
+
+        if re.search(r'\b(?:поиграем|сыграем|давай поиграем|хочу играть|го играть)\s+(?:в\s+)?города\b', text_low):
+            res = self.city_game.start_game()
+            res["user_display"] = user_display
+            res["is_whisper"] = is_whisper
+            return res
+
+        if re.search(r'\b(?:поиграем|сыграем|давай поиграем|хочу играть|го играть)\s+(?:в\s+)?(?:верю\s*(?:не\s*верю)?|факты|викторину)\b', text_low):
+            res = self.believe_game.start_game()
+            res["user_display"] = user_display
+            res["is_whisper"] = is_whisper
+            return res
+
+        if re.search(r'\b(?:поиграем|сыграем|давай поиграем|хочу играть|го играть)\s+(?:в\s+)?(?:данетк[а-я]*|детектив[а-я]*)\b', text_low):
+            res = self.danetki_game.start_game()
+            res["user_display"] = user_display
+            res["is_whisper"] = is_whisper
+            return res
+
+        general_game_patterns = [
+            r'\bдавай\s+(?:играть|поиграем|сыграем)\b',
+            r'\bхочу\s+(?:играть|поиграть)\b',
+            r'\bво\s+что\s+(?:поиграем|сыграем|можно\s+поиграть)\b',
+            r'\bкакие\s+игры\s+есть\b',
+            r'\bсыграем\b',
+            r'\bпоиграем\b'
+        ]
+        if any(re.search(p, text_low) for p in general_game_patterns):
+            if not any(w in text_low for w in ["трек", "музык", "песн"]):
+                self.waiting_for_game_choice = True
+                self.last_discussed_game = None
+                ans = (
+                    "С удовольствием! У меня есть три игры: «Города», «Верю — не верю» и детективные «Данетки». "
+                    "Во что хочешь сыграть? Или рассказать правила?"
+                )
+                return {
+                    "user_display": user_display,
+                    "chat": ans,
+                    "voice": ans,
+                    "emotion": "happy",
+                    "is_whisper": is_whisper,
+                    "followup": True
+                }
+
+        if text_low.startswith(("запомни,", "запомни:", "запомни что", "запомни, что", "запомни")):
+            clean_fact = re.sub(r'^(?:астра,?\s*)?запомни(?:,?\s*что|:)?\s*', '', text, flags=re.IGNORECASE).strip()
+            if len(clean_fact) >= 3:
+                self.llm.memory.add_fact(clean_fact)
+                ans = f"Запомнила: {clean_fact} ✨"
+                return {
+                    "user_display": user_display,
+                    "chat": ans,
+                    "voice": ans,
+                    "emotion": "happy",
+                    "is_whisper": is_whisper
+                }
 
         if attached_file:
             file_text = self.doc_parser.parse_file(attached_file)
@@ -483,6 +713,91 @@ class CommandParser:
             else:
                 msg = "Не удалось распознать текст в этом файле."
                 return {"user_display": user_display, "chat": msg, "voice": msg, "emotion": emotion, "is_whisper": is_whisper}
+
+        if re.search(r'\b(?:отмени(?:ть)?|удали(?:ть)?|сбрось|сбросить|убери|выключи)\s+(?:все\s+)?таймер[а-я]*\b', text_low):
+            removed = self.reminder_manager.cancel_timers()
+            ans = "Отменила таймер ⏳" if removed > 0 else "Сейчас нет активных таймеров."
+            return {
+                "user_display": user_display,
+                "chat": ans,
+                "voice": ans,
+                "emotion": "happy" if removed > 0 else "neutral",
+                "is_whisper": is_whisper
+            }
+
+        if re.search(r'\b(?:отмени(?:ть)?|удали(?:ть)?|сбрось|сбросить|убери|выключи)\s+(?:все\s+)?будильник[а-я]*\b', text_low):
+            removed = self.reminder_manager.cancel_alarms()
+            ans = "Отменила будильник ⏰" if removed > 0 else "Нет установленных будильников."
+            return {
+                "user_display": user_display,
+                "chat": ans,
+                "voice": ans,
+                "emotion": "happy" if removed > 0 else "neutral",
+                "is_whisper": is_whisper
+            }
+
+        cancel_rem_match = re.search(
+            r'\b(?:отмени(?:ть)?|удали(?:ть)?|сбрось|сбросить|убери|сними)\s+(?:напоминани[а-я]*|напоминалк[а-я]*)(?:\s+(?:про|о|об|на)?\s*(.+))?\b',
+            text_low
+        )
+        if cancel_rem_match:
+            spec_topic = cancel_rem_match.group(1)
+            search_text = spec_topic.strip() if spec_topic else ""
+            removed = self.reminder_manager.cancel_reminders(search_text=search_text)
+            if removed > 0:
+                ans = f"Удалила напоминание: {search_text} 🗑️" if search_text else "Удалила напоминания 🗑️"
+            else:
+                ans = f"Не нашла напоминаний по теме '{search_text}'." if search_text else "Нет активных напоминаний."
+            return {
+                "user_display": user_display,
+                "chat": ans,
+                "voice": ans,
+                "emotion": "happy" if removed > 0 else "neutral",
+                "is_whisper": is_whisper
+            }
+
+        if re.search(r'\b(?:поставь|заведи|включи)?\s*будильник\b', text_low):
+            target_dt, _ = self.time_parser.parse_absolute_time(text_low, is_alarm=True)
+            if target_dt:
+                self.reminder_manager.add_alarm(target_dt)
+                time_str = target_dt.strftime("%H:%M")
+                ans = f"Поставила будильник на {time_str} ⏰"
+                return {"user_display": user_display, "chat": ans, "voice": ans, "emotion": "happy", "is_whisper": is_whisper}
+
+        if re.search(r'\b(?:поставь|запусти|засеки)?\s*таймер\b', text_low):
+            sec, _ = self.time_parser.parse_relative_seconds(text_low)
+            if sec:
+                dur_str = self.time_parser.format_duration(sec)
+                self.reminder_manager.add_timer(sec, f"Таймер на {dur_str}")
+                ans = f"Запустила таймер на {dur_str} ⏳"
+                return {"user_display": user_display, "chat": ans, "voice": ans, "emotion": "happy", "is_whisper": is_whisper}
+
+        if re.search(r'\b(?:напомни|напоминание)\b', text_low):
+            target_dt, rem_text = self.time_parser.parse_reminder(text_low)
+            if target_dt and rem_text:
+                self.reminder_manager.add_reminder(target_dt, rem_text)
+
+                now = datetime.now()
+                time_str = target_dt.strftime("%H:%M")
+                if target_dt.date() == now.date():
+                    date_prefix = f"В {time_str}"
+                elif target_dt.date() == (now + timedelta(days=1)).date():
+                    date_prefix = f"Завтра в {time_str}"
+                elif target_dt.date() == (now + timedelta(days=2)).date():
+                    date_prefix = f"Послезавтра в {time_str}"
+                elif target_dt.year != now.year:
+                    date_prefix = f"{target_dt.strftime('%d.%m.%Y')} в {time_str}"
+                else:
+                    date_prefix = f"{target_dt.strftime('%d.%m')} в {time_str}"
+
+                ans = f"Договорились! {date_prefix} напомню: {rem_text} 📝"
+                return {
+                    "user_display": user_display,
+                    "chat": ans,
+                    "voice": ans,
+                    "emotion": "happy",
+                    "is_whisper": is_whisper
+                }
 
         if self.waiting_for_zapret:
             num = self._extract_zapret_number(text_low)
@@ -542,6 +857,48 @@ class CommandParser:
                 "emotion": emotion,
                 "is_whisper": is_whisper
             }
+
+        open_match = re.match(r'^(?:астра,?\s*)?(?:открой|запусти|вруби|подруби|включи)\s+(.+)$', text_low)
+        if open_match:
+            candidate_app = open_match.group(1).strip()
+            ignored_words = {
+                "музыку", "трек", "песню", "музло", "свет", "люстру", "розетку",
+                "компьютер", "пк", "браузер", "ютуб", "погоду", "запрет", "обход",
+                "работу", "отдых", "рабочий режим", "режим отдыха",
+                "сота", "sota", "соту", "соте", "сотой", "соты", "сотовый",
+                "sota vpn", "sota connect", "сота впн", "соту впн", "соте впн",
+                "сото", "сома", "сона", "сопа", "с0та", "сота вп", "соточка",
+                "сотка", "соты впн", "сота коннект", "сота соединение",
+                "сота интернет", "салат", "салата", "салату", "салате",
+                "салатом", "салаты", "салатик", "салату впн", "салат впн",
+                "сорту", "сотру", "happ", "хапп", "хэпп", "хепп", "хап", "хэп", "хеп", "хат",
+                "хаппа", "хаппе", "хаппом", "хаппу", "happ vpn", "хапп впн", "хэпп впн",
+                "хаб", "хабб", "хаппи", "хэппи", "хепи", "хапи", "хап впн",
+                "хэп впн", "хеп впн", "хапп соединение", "хапп интернет",
+                "хапп сервис", "v2ray", "xray", "в2рей", "в2рай", "иксрей", "ви ту рэй", "ви ту рей",
+                "виту рэй", "витурей", "витурэй", "v2ray vpn", "в2рей впн",
+                "втурай", "втурэй", "витурай", "витурэй", "виту рай",
+                "виту рей", "витурай впн", "витурэй впн", "втурея",
+                "втурей", "втурый", "wireguard", "вайргард", "вирегуард", "варгвард", "варгард", "варгарт",
+                "вайргарда", "вайргарду", "вайргардом", "wireguard vpn",
+                "вайргард впн", "вайргард сервис", "вайргард подключение",
+                "вайргард интернет", "вайргуард", "вайргвард", "вайргарт",
+                "вайргорд", "виргард", "виргуард", "вайргард соединение",
+                "впн", "vpn", "вэ пэ эн", "вэпээн", "випиэн", "ви пи эн", "впээн", "вэпэн",
+                "вэпээн", "випиэн", "вэпэн", "випэн", "впнн", "вппн", "ввпн", "впм",
+                "вбн", "фпн", "впэен", "впиэн"
+            }
+            if candidate_app not in ignored_words:
+                launched, app_title = self.app_launcher.launch(candidate_app)
+                if launched:
+                    ans = f"Открываю {app_title}"
+                    return {
+                        "user_display": user_display,
+                        "chat": ans,
+                        "voice": ans,
+                        "emotion": "happy",
+                        "is_whisper": is_whisper
+                    }
 
         num_direct = self._extract_zapret_number(text_low)
         if num_direct is not None and any(w in text_low for w in ["обход", "стратеги", "вариант", "запрет"]):
@@ -611,9 +968,11 @@ class CommandParser:
             return {"user_display": disp, "chat": "" if is_voice else res, "voice": res, "emotion": emotion, "is_whisper": is_whisper}
 
         if rule_intent == "chat":
-            prompt_with_emotion = f"[{emo_desc}] {text}" if emotion in ["sad", "happy"] else text
-            ans = self.llm.ask(prompt_with_emotion)
-            return {"user_display": user_display, "chat": ans, "voice": ans, "emotion": emotion, "is_whisper": is_whisper}
+            user_prefix = f"[Говорит пользователь: {speaker_name}] " if not is_owner else ""
+            prompt_with_emotion = f"{user_prefix}[Эмоциональный тон пользователя: {emo_desc}] {text}" if emotion != "neutral" else f"{user_prefix}{text}"
+            ans = self.llm.ask(prompt_with_emotion, raw_user_text=text)
+            return {"user_display": user_display, "chat": ans, "voice": ans, "emotion": emotion,
+                    "is_whisper": is_whisper, "followup": True}
 
         if not self.is_ready:
             self.loader_thread.join()
@@ -660,6 +1019,7 @@ class CommandParser:
                         return {"user_display": canonical_display, "chat": "" if is_voice else res_str, "voice": res_str, "emotion": emotion, "is_whisper": is_whisper}
                     return {"user_display": canonical_display, "chat": res_str, "voice": res_str, "emotion": emotion, "is_whisper": is_whisper}
 
-        prompt_with_emotion = f"[Интонация пользователя: {emo_desc}] {text}" if emotion in ["sad", "happy"] else text
-        ans = self.llm.ask(prompt_with_emotion)
-        return {"user_display": user_display, "chat": ans, "voice": ans, "emotion": emotion, "is_whisper": is_whisper}
+        prompt_with_emotion = f"[Эмоциональный тон пользователя: {emo_desc}] {text}" if emotion != "neutral" else text
+        ans = self.llm.ask(prompt_with_emotion, raw_user_text=text)
+        return {"user_display": user_display, "chat": ans, "voice": ans, "emotion": emotion, "is_whisper": is_whisper,
+                "followup": True}

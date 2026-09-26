@@ -10,6 +10,13 @@
     "use_spotify": false,
     "vpn_service": "",
     "hdrezka_domain": "https://ru1.hdreskaz.top",
+    "voice_volume": 100,
+    "alarm_sound": "alarm_1",
+    "custom_alarm_path": "",
+    "target_fps": 60,
+    "is_muted": false,
+    "is_mini_mode": false,
+    "is_whisper_mode": false,
     "work_apps": [
         "https://github.com"
     ],

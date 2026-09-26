@@ -10,3 +10,7 @@ personal_data/owner_face/*
 !personal_data/configs/config.py
 !personal_data/configs/config.template.json
 !personal_data/owner_face/.gitkeep
+
+# Мусор
+temp_model*
+*.data
